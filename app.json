@@ -50,6 +50,11 @@
         }
       ]
     ],
-    "owner": "bamacharanchhandogi"
+    "owner": "bamacharanchhandogi",
+    "extra": {
+      "eas": {
+        "projectId": "4b6f2660-1277-40bb-9166-e882c2a4eeb5"
+      }
+    }
   }
 }
