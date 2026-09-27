@@ -5,15 +5,23 @@ import {
   StyleSheet, 
   FlatList, 
   TouchableOpacity, 
-  SafeAreaView, 
   ActivityIndicator, 
   RefreshControl,
   TextInput,
   Image
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import { 
+  Search, 
+  User, 
+  UserPlus, 
+  CheckCircle2, 
+  AlertCircle, 
+  ChevronRight,
+  Sparkles
+} from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { getAllStaff } from '../../services/database';
 import { resolvePhotoUri } from '../../services/fileSystem';
@@ -69,7 +77,9 @@ export default function StaffListScreen() {
           {photoUri ? (
             <Image source={{ uri: photoUri }} style={styles.avatarImage} />
           ) : (
-            <Ionicons name="person" size={24} color="white" />
+            <View style={styles.avatarFallback}>
+              <User size={20} color="#94A3B8" />
+            </View>
           )}
         </View>
 
@@ -79,107 +89,106 @@ export default function StaffListScreen() {
         </View>
 
         <View style={[styles.badge, item.isEnrolled ? styles.badgeEnrolled : styles.badgeNotEnrolled]}>
-          <Ionicons 
-            name={item.isEnrolled ? "checkmark-circle" : "alert-circle"} 
-            size={12} 
-            color={item.isEnrolled ? "#059669" : "#D97706"} 
-            style={{ marginRight: 3 }}
-          />
+          {item.isEnrolled ? (
+            <CheckCircle2 size={12} color="#059669" style={{ marginRight: 4 }} />
+          ) : (
+            <AlertCircle size={12} color="#D97706" style={{ marginRight: 4 }} />
+          )}
           <Text style={[styles.badgeText, item.isEnrolled ? styles.badgeTextEnrolled : styles.badgeTextNotEnrolled]}>
             {item.isEnrolled ? 'Enrolled' : 'Pending'}
           </Text>
         </View>
 
-        <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        <ChevronRight size={18} color="#CBD5E1" />
       </TouchableOpacity>
     );
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       {/* Search Header */}
       <View style={styles.searchBarContainer}>
-        <Ionicons name="search" size={20} color={Colors.textSecondary} style={{ marginRight: Spacing.sm }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name or Employee ID..."
-          placeholderTextColor={Colors.textTertiary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        )}
+        <View style={styles.searchBox}>
+          <Search size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search staff by name or ID..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
       </View>
 
-      {loading && !refreshing ? (
-        <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
       ) : (
         <FlatList
           data={filteredStaff}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
-          }
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) + 40 }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={56} color={Colors.textTertiary} />
-              <Text style={styles.emptyText}>
-                {searchQuery ? 'No matching staff members' : 'No staff members found'}
-              </Text>
-              <Text style={styles.emptySubtext}>
-                {searchQuery ? 'Try a different search term' : 'Tap the + button below to add staff.'}
+              <User size={48} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No Staff Found</Text>
+              <Text style={styles.emptySubtitle}>
+                {searchQuery ? 'No matching staff members found.' : 'Add your first staff member to get started.'}
               </Text>
             </View>
           }
         />
       )}
-      
-      {/* Floating Action Button */}
+
+      {/* Floating Add Staff Button */}
       <TouchableOpacity 
-        style={styles.fab}
+        style={[styles.fab, { bottom: Math.max(insets.bottom, 16) + 16 }]}
         onPress={() => navigation.navigate('AddStaff')}
         activeOpacity={0.85}
       >
-        <Ionicons name="add" size={28} color="white" />
+        <UserPlus size={22} color="#FFFFFF" />
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
   searchBarContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    marginHorizontal: Spacing.m,
-    marginTop: Spacing.m,
-    paddingHorizontal: Spacing.m,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: 12,
+    height: 44,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    ...Shadows.sm,
   },
   searchInput: {
     flex: 1,
-    ...Typography.body,
+    fontSize: 14,
     color: Colors.textPrimary,
   },
-  listContainer: {
-    padding: Spacing.m,
-    paddingBottom: Spacing.xxl + 20,
+  listContent: {
+    padding: Spacing.md,
     flexGrow: 1,
   },
-  loader: {
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -187,89 +196,99 @@ const styles = StyleSheet.create({
   staffCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: Spacing.m,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
+    backgroundColor: '#FFFFFF',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.xs + 2,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
     ...Shadows.sm,
   },
   avatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    marginRight: Spacing.m,
+    marginRight: Spacing.md,
   },
   avatarImage: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  avatarFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   staffInfo: {
     flex: 1,
   },
   staffName: {
-    ...Typography.bodySemiBold,
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.textPrimary,
+    letterSpacing: -0.3,
   },
   employeeId: {
-    ...Typography.caption,
+    fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.s,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-    marginRight: Spacing.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginRight: 8,
   },
   badgeEnrolled: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#DCFCE7',
   },
   badgeNotEnrolled: {
     backgroundColor: '#FEF3C7',
   },
   badgeText: {
-    ...Typography.smallMedium,
+    fontSize: 11,
+    fontWeight: '600',
   },
   badgeTextEnrolled: {
-    color: '#059669',
+    color: '#15803D',
   },
   badgeTextNotEnrolled: {
-    color: '#D97706',
+    color: '#B45309',
   },
   emptyContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xxl,
+    alignItems: 'center',
+    paddingVertical: 60,
   },
-  emptyText: {
-    ...Typography.h3,
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.textPrimary,
-    marginTop: Spacing.m,
+    marginTop: 12,
   },
-  emptySubtext: {
-    ...Typography.body,
+  emptySubtitle: {
+    fontSize: 13,
     color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 32,
   },
   fab: {
     position: 'absolute',
-    bottom: Spacing.xl,
-    right: Spacing.xl,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#0084FF',
-    alignItems: 'center',
+    bottom: 24,
+    right: 20,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
-    ...Shadows.lg,
+    alignItems: 'center',
+    ...Shadows.md,
   },
 });

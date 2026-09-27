@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView as ExpoCameraView, useCameraPermissions } from 'expo-camera';
-import { Ionicons } from '@expo/vector-icons';
+import { X, RotateCcw, Camera } from 'lucide-react-native';
 import { FaceOverlay } from './FaceOverlay';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 
@@ -13,6 +14,8 @@ interface CameraViewProps {
 }
 
 export function CameraView({ onCapture, onClose, mode = 'verify', promptMessage }: CameraViewProps) {
+  const insets = useSafeAreaInsets();
+  const topBarPadding = Math.max(insets.top, 24) + 10;
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -32,7 +35,7 @@ export function CameraView({ onCapture, onClose, mode = 'verify', promptMessage 
   if (!permission.granted) {
     return (
       <View style={styles.centerContainer}>
-        <Ionicons name="camera-outline" size={48} color={Colors.textSecondary} />
+        <Camera size={48} color={Colors.textSecondary} />
         <Text style={styles.textTitle}>Camera Permission Required</Text>
         <Text style={styles.textSubtitle}>
           SalaryBox FacePass requires camera access to {mode === 'enroll' ? 'enrol your face' : 'verify your identity'}.
@@ -55,7 +58,7 @@ export function CameraView({ onCapture, onClose, mode = 'verify', promptMessage 
         setIsProcessing(true);
         setFaceStatus('scanning');
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
+          quality: 0.85,
           skipProcessing: false,
         });
         if (photo?.uri) {
@@ -89,12 +92,12 @@ export function CameraView({ onCapture, onClose, mode = 'verify', promptMessage 
       <FaceOverlay status={faceStatus} message={promptMessage || defaultMessage} />
 
       {/* Top Controls Header */}
-      <SafeAreaView style={styles.topBar}>
+      <View style={[styles.topBar, { top: topBarPadding }]}>
         {onClose ? (
-          <TouchableOpacity style={styles.iconButton} onPress={onClose}>
-            <Ionicons name="close" size={26} color="white" />
+          <TouchableOpacity style={styles.iconButton} onPress={onClose} hitSlop={10}>
+            <X size={22} color="#FFFFFF" />
           </TouchableOpacity>
-        ) : <View style={{ width: 44 }} />}
+        ) : <View style={{ width: 40 }} />}
 
         <View style={styles.modeBadge}>
           <Text style={styles.modeBadgeText}>
@@ -102,10 +105,10 @@ export function CameraView({ onCapture, onClose, mode = 'verify', promptMessage 
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.iconButton} onPress={toggleFacing}>
-          <Ionicons name="camera-reverse-outline" size={24} color="white" />
+        <TouchableOpacity style={styles.iconButton} onPress={toggleFacing} hitSlop={10}>
+          <RotateCcw size={20} color="#FFFFFF" />
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
       
       {/* Bottom Controls */}
       <View style={styles.bottomControls}>
@@ -132,7 +135,7 @@ export function CameraView({ onCapture, onClose, mode = 'verify', promptMessage 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
   },
   centerContainer: {
     flex: 1,
@@ -150,28 +153,28 @@ const styles = StyleSheet.create({
   textSubtitle: {
     ...Typography.body,
     color: Colors.textSecondary,
+    textAlign: 'center',
     marginTop: Spacing.sm,
     marginBottom: Spacing.xl,
-    textAlign: 'center',
+    lineHeight: 22,
   },
   permissionButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: BorderRadius.md,
-    width: '100%',
-    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: BorderRadius.lg,
   },
   permissionButtonText: {
     ...Typography.button,
-    color: 'white',
+    color: '#FFFFFF',
   },
   cancelButton: {
     marginTop: Spacing.md,
     paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
   },
   cancelButtonText: {
-    ...Typography.body,
+    ...Typography.bodyMedium,
     color: Colors.textSecondary,
   },
   topBar: {
@@ -182,59 +185,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     zIndex: 10,
   },
   iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modeBadge: {
     backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   modeBadgeText: {
-    ...Typography.smallMedium,
+    fontSize: 11,
+    fontWeight: '700',
     color: '#00D2B4',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   bottomControls: {
     position: 'absolute',
-    bottom: Spacing.xl,
-    width: '100%',
+    bottom: 30,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    zIndex: 10,
+    justifyContent: 'center',
   },
   captureBtn: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     borderWidth: 4,
-    borderColor: 'white',
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   captureBtnDisabled: {
     opacity: 0.5,
   },
   captureBtnInner: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: 'white',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#0084FF',
   },
   hintText: {
-    ...Typography.smallMedium,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
     marginTop: Spacing.sm,
   },
 });

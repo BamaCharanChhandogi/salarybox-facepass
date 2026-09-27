@@ -1,10 +1,26 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Modal 
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import { 
+  ArrowLeft, 
+  RotateCcw, 
+  ScanFace, 
+  Camera, 
+  CheckCircle2, 
+  AlertCircle,
+  ShieldCheck 
+} from 'lucide-react-native';
 import { CameraView as ExpoCameraView, useCameraPermissions } from 'expo-camera';
-import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { enrollFace } from '../../services/database';
 import { saveFacePhoto } from '../../services/fileSystem';
 import { validateEnrollmentPhoto } from '../../services/faceRecognition';
@@ -21,8 +37,15 @@ export default function FaceEnrollScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Verifying face with Face++ AI...');
+  const [loadingMessage, setLoadingMessage] = useState('Verifying face biometrics...');
   const [facing, setFacing] = useState<'front' | 'back'>('front');
+  
+  const insets = useSafeAreaInsets();
+  const topHeaderPadding = Math.max(insets.top, 24) + Spacing.xs;
+  
+  // Minimal success & error modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -46,37 +69,26 @@ export default function FaceEnrollScreen() {
       }
 
       setLoadingMessage('Validating face via Face++ AI...');
-      // Real Face++ API quality check
       const validation = await validateEnrollmentPhoto(photo.uri);
 
       if (!validation.valid) {
-        Alert.alert(
-          'Face Quality Check Failed',
-          validation.error || 'Please align your face directly inside the oval and ensure good lighting.',
-          [{ text: 'Try Again' }]
-        );
+        setErrorMessage(validation.error || 'Please center face directly inside the oval and ensure good lighting.');
         return;
       }
 
       // Save photo to permanent local storage
       const relativePhotoPath = await saveFacePhoto(staffId, photo.uri);
 
-      // Save to SQLite (store faceToken or identifier in embedding field)
+      // Save to SQLite
       const embeddingToken = validation.faceToken ? [validation.faceToken] : [1.0];
       await enrollFace(staffId, embeddingToken as any, relativePhotoPath);
 
-      Alert.alert(
-        'Face Enrolled Successfully! 🎉',
-        `Biometric profile has been registered for ${staffName}. They can now use selfie face verification for attendance.`,
-        [{ text: 'Done', onPress: () => navigation.goBack() }]
-      );
+      // Trigger minimal elegant success modal
+      setShowSuccessModal(true);
 
     } catch (error: any) {
       console.error('[FaceEnroll] Error:', error);
-      Alert.alert(
-        'Enrollment Failed', 
-        error.message || 'Network error or unable to contact Face++ service. Please try again.'
-      );
+      setErrorMessage(error.message || 'Network error or unable to contact Face++ service. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -87,39 +99,49 @@ export default function FaceEnrollScreen() {
   };
 
   if (!permission) {
-    return <SafeAreaView style={styles.container} />;
+    return <View style={styles.container} />;
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: topHeaderPadding }]}>
         <View style={styles.permissionBox}>
-          <Ionicons name="camera-outline" size={48} color={Colors.textSecondary} />
-          <Text style={styles.permissionTitle}>Camera Permission Required</Text>
+          <Camera size={48} color={Colors.textSecondary} />
+          <Text style={styles.permissionTitle}>Camera Access Required</Text>
           <Text style={styles.permissionSubtitle}>
-            Camera is required to capture and enrol staff face biometrics.
+            Camera is required to capture and enrol staff face biometrics for 1:1 attendance verification.
           </Text>
           <TouchableOpacity style={styles.primaryBtn} onPress={requestPermission}>
             <Text style={styles.primaryBtnText}>Grant Camera Permission</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header Bar */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+    <View style={styles.container}>
+      {/* Top Header Bar */}
+      <View style={[styles.header, { paddingTop: topHeaderPadding }]}>
+        <TouchableOpacity 
+          style={styles.headerBtn} 
+          onPress={() => navigation.goBack()}
+          hitSlop={10}
+        >
+          <ArrowLeft size={20} color="#FFFFFF" />
         </TouchableOpacity>
+
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Face Enrolment</Text>
           <Text style={styles.headerSubtitle}>{staffName}</Text>
         </View>
-        <TouchableOpacity style={styles.headerBtn} onPress={toggleFacing}>
-          <Ionicons name="camera-reverse-outline" size={24} color="white" />
+
+        <TouchableOpacity 
+          style={styles.headerBtn} 
+          onPress={toggleFacing}
+          hitSlop={10}
+        >
+          <RotateCcw size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
@@ -143,9 +165,9 @@ export default function FaceEnrollScreen() {
           </View>
           <View style={styles.bottomMask}>
             <View style={styles.instructionsBadge}>
-              <Ionicons name="scan-outline" size={16} color="#00D2B4" style={{ marginRight: 6 }} />
+              <ScanFace size={16} color="#00D2B4" style={{ marginRight: 6 }} />
               <Text style={styles.instructionsText}>
-                Center face inside the oval and hold steady
+                Center face inside oval & hold steady
               </Text>
             </View>
           </View>
@@ -161,7 +183,7 @@ export default function FaceEnrollScreen() {
           activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator size="large" color="white" />
+            <ActivityIndicator size="large" color="#FFFFFF" />
           ) : (
             <View style={styles.captureButtonInner} />
           )}
@@ -180,20 +202,80 @@ export default function FaceEnrollScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+
+      {/* Minimal Elegant Success Modal (Zero Raw Data Dump) */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.successIconCircle}>
+              <CheckCircle2 size={36} color="#0D9488" />
+            </View>
+            
+            <Text style={styles.modalTitle}>Face Enrolled Successfully</Text>
+            <Text style={styles.modalDescription}>
+              Biometric profile registered for {staffName}. They can now use 1:1 facial verification to punch attendance.
+            </Text>
+
+            <TouchableOpacity 
+              style={styles.modalPrimaryBtn}
+              onPress={() => {
+                setShowSuccessModal(false);
+                navigation.goBack();
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalPrimaryBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Subtle Error Modal */}
+      <Modal
+        visible={!!errorMessage}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.errorIconCircle}>
+              <AlertCircle size={36} color="#E11D48" />
+            </View>
+            
+            <Text style={styles.modalTitle}>Face Check Failed</Text>
+            <Text style={styles.modalDescription}>
+              {errorMessage}
+            </Text>
+
+            <TouchableOpacity 
+              style={styles.modalTryAgainBtn}
+              onPress={() => setErrorMessage(null)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalTryAgainBtnText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
   },
   permissionBox: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
     padding: Spacing.xl,
   },
   permissionTitle: {
@@ -207,16 +289,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.sm,
     marginBottom: Spacing.xl,
+    lineHeight: 22,
   },
   primaryBtn: {
     backgroundColor: Colors.primary,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: BorderRadius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: BorderRadius.lg,
   },
   primaryBtnText: {
     ...Typography.button,
-    color: 'white',
+    color: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -224,13 +307,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     zIndex: 10,
   },
   headerBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -239,13 +322,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    ...Typography.h3,
-    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    ...Typography.smallMedium,
+    fontSize: 13,
     color: '#00D2B4',
-    marginTop: 2,
+    fontWeight: '600',
+    marginTop: 1,
   },
   cameraContainer: {
     flex: 1,
@@ -264,7 +350,7 @@ const styles = StyleSheet.create({
   },
   middleRow: {
     flexDirection: 'row',
-    height: 340,
+    height: 330,
   },
   sideMask: {
     flex: 1,
@@ -272,18 +358,18 @@ const styles = StyleSheet.create({
   },
   faceOval: {
     width: 250,
-    height: 340,
+    height: 330,
     borderRadius: 125,
-    borderWidth: 3,
+    borderWidth: 2.5,
     borderColor: '#00D2B4',
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },
   scanTarget: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(0,210,180,0.4)',
   },
@@ -291,34 +377,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
     alignItems: 'center',
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.md,
   },
   instructionsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    backgroundColor: 'rgba(15,23,42,0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   instructionsText: {
-    ...Typography.captionMedium,
-    color: 'white',
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
   footer: {
     paddingVertical: Spacing.lg,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
   captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     borderWidth: 4,
-    borderColor: 'white',
+    borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -326,13 +413,13 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   captureButtonInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#0084FF',
   },
   footerHint: {
-    ...Typography.small,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.7)',
     marginTop: Spacing.sm,
   },
@@ -349,16 +436,91 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   loadingCard: {
-    backgroundColor: 'white',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     alignItems: 'center',
     width: '85%',
+    ...Shadows.lg,
   },
   loadingText: {
-    ...Typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.textPrimary,
     marginTop: Spacing.md,
     textAlign: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    width: '90%',
+    maxWidth: 380,
+    alignItems: 'center',
+    ...Shadows.lg,
+  },
+  successIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#CCFBF1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  errorIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#FFE4E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: Spacing.lg,
+  },
+  modalPrimaryBtn: {
+    backgroundColor: Colors.primary,
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+  },
+  modalPrimaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalTryAgainBtn: {
+    backgroundColor: '#F1F5F9',
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+  },
+  modalTryAgainBtnText: {
+    color: Colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

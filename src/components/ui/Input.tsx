@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, TextInputProps } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 
 export interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
-  leftIcon?: keyof typeof Ionicons.glyphMap;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 export const Input: React.FC<InputProps> = ({ 
   label, 
   error, 
   leftIcon, 
+  rightIcon,
   style, 
   onFocus, 
   onBlur, 
@@ -39,21 +40,15 @@ export const Input: React.FC<InputProps> = ({
         isFocused && styles.inputFocused,
         error ? styles.inputError : null
       ]}>
-        {leftIcon && (
-          <Ionicons 
-            name={leftIcon} 
-            size={20} 
-            color={isFocused ? Colors.primary : Colors.text + '80'} 
-            style={styles.icon} 
-          />
-        )}
+        {leftIcon && <View style={styles.icon}>{leftIcon}</View>}
         <TextInput
           style={[styles.input, style]}
-          placeholderTextColor={Colors.text + '60'}
+          placeholderTextColor="#94A3B8"
           onFocus={handleFocus}
           onBlur={handleBlur}
           {...props}
         />
+        {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
       </View>
       
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -68,37 +63,46 @@ const styles = StyleSheet.create({
   },
   label: {
     ...Typography.bodyMedium,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginBottom: 6,
+    letterSpacing: -0.2,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.text + '20',
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.sm,
-    height: 48,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    height: 50,
   },
   inputFocused: {
     borderColor: Colors.primary,
+    backgroundColor: '#FFFFFF',
   },
   inputError: {
     borderColor: Colors.error,
   },
   icon: {
-    marginRight: Spacing.sm,
+    marginRight: 10,
+  },
+  rightIcon: {
+    marginLeft: 10,
   },
   input: {
     flex: 1,
     ...Typography.body,
-    color: Colors.text,
+    fontSize: 14,
+    color: Colors.textPrimary,
     height: '100%',
   },
   errorText: {
     ...Typography.caption,
+    fontSize: 12,
     color: Colors.error,
-    marginTop: Spacing.xs,
+    marginTop: 4,
   },
 });

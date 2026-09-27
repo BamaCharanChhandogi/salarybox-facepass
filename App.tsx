@@ -8,7 +8,7 @@ import {
   Inter_700Bold 
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
-import { Providers } from './src/app/Providers';
+import { Providers } from './src/Providers';
 
 // Safely prevent auto hide (catch in Expo Go to avoid crashing)
 SplashScreen.preventAutoHideAsync().catch(() => {});

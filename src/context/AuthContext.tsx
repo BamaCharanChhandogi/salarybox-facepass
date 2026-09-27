@@ -4,6 +4,7 @@ import { authenticateUser } from '../services/database';
 
 interface AuthContextType extends AuthState {
   login: (employeeId: string, password: string) => Promise<boolean>;
+  loginDirectly: (user: User) => void;
   logout: () => void;
 }
 
@@ -11,6 +12,7 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   user: null,
   login: async () => false,
+  loginDirectly: () => {},
   logout: () => {},
 });
 
@@ -34,12 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginDirectly = useCallback((user: User) => {
+    setAuthState({ isAuthenticated: true, user });
+  }, []);
+
   const logout = useCallback(() => {
     setAuthState({ isAuthenticated: false, user: null });
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...authState, login, logout }}>
+    <AuthContext.Provider value={{ ...authState, login, loginDirectly, logout }}>
       {children}
     </AuthContext.Provider>
   );

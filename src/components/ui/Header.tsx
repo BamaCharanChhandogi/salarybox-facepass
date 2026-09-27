@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ArrowLeft } from 'lucide-react-native';
 import { Colors, Typography, Spacing } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,28 +9,26 @@ export interface HeaderProps {
   subtitle?: string;
   onBack?: () => void;
   rightAction?: {
-    icon: keyof typeof Ionicons.glyphMap;
+    icon: React.ReactNode;
     onPress: () => void;
   };
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle, onBack, rightAction }) => {
-  // Try to use safe area insets if provider exists, fallback to 0
   let topInset = 0;
   try {
     const insets = useSafeAreaInsets();
     topInset = insets.top;
   } catch (e) {
-    // Ignore error if useSafeAreaInsets is used outside SafeAreaProvider
-    topInset = 40; // reasonable fallback
+    topInset = 40;
   }
 
   return (
     <View style={[styles.container, { paddingTop: topInset + Spacing.sm }]}>
       <View style={styles.content}>
         {onBack ? (
-          <Pressable onPress={onBack} style={styles.iconButton}>
-            <Ionicons name="arrow-back" size={24} color={Colors.surface} />
+          <Pressable onPress={onBack} style={styles.iconButton} hitSlop={10}>
+            <ArrowLeft size={22} color="#FFFFFF" />
           </Pressable>
         ) : (
           <View style={styles.placeholder} />
@@ -42,8 +40,8 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, onBack, rightAc
         </View>
 
         {rightAction ? (
-          <Pressable onPress={rightAction.onPress} style={styles.iconButton}>
-            <Ionicons name={rightAction.icon} size={24} color={Colors.surface} />
+          <Pressable onPress={rightAction.onPress} style={styles.iconButton} hitSlop={10}>
+            {rightAction.icon}
           </Pressable>
         ) : (
           <View style={styles.placeholder} />
@@ -70,19 +68,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
   },
   title: {
-    ...Typography.h2,
-    color: Colors.surface,
+    ...Typography.h3,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   subtitle: {
     ...Typography.caption,
-    color: Colors.surface,
-    opacity: 0.8,
+    color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
   },
   iconButton: {
     padding: Spacing.xs,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   placeholder: {
-    width: 32, // approximately the width of the icon button
+    width: 36,
   },
 });

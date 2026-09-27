@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { Clock, MapPin, Calendar, CheckCircle2, ScanFace } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { getAttendanceForUser } from '../../services/database';
@@ -10,6 +11,7 @@ import { AttendanceRecord } from '../../types';
 import { formatTime, formatDate } from '../../utils/dateFormat';
 
 export function HistoryScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,6 +37,7 @@ export function HistoryScreen() {
 
   const renderItem = ({ item }: { item: AttendanceRecord }) => {
     const selfieUri = resolvePhotoUri(item.selfieUri);
+    const isCheckIn = item.type === 'check_in';
 
     return (
       <View style={styles.card}>
@@ -44,11 +47,9 @@ export function HistoryScreen() {
             {selfieUri ? (
               <Image source={{ uri: selfieUri }} style={styles.thumbImage} />
             ) : (
-              <Ionicons 
-                name={item.type === 'check_in' ? 'log-in-outline' : 'log-out-outline'} 
-                size={24} 
-                color={item.type === 'check_in' ? Colors.secondary : Colors.primary} 
-              />
+              <View style={[styles.typeIconBox, isCheckIn ? styles.typeCheckInBox : styles.typeCheckOutBox]}>
+                <Clock size={20} color={isCheckIn ? '#059669' : '#0284C7'} />
+              </View>
             )}
           </View>
 
@@ -57,13 +58,13 @@ export function HistoryScreen() {
             <View style={styles.titleRow}>
               <View style={[
                 styles.typeBadge, 
-                item.type === 'check_in' ? styles.typeCheckIn : styles.typeCheckOut
+                isCheckIn ? styles.typeCheckIn : styles.typeCheckOut
               ]}>
                 <Text style={[
                   styles.typeBadgeText, 
-                  item.type === 'check_in' ? styles.textCheckIn : styles.textCheckOut
+                  isCheckIn ? styles.textCheckIn : styles.textCheckOut
                 ]}>
-                  {item.type === 'check_in' ? 'CHECK IN' : 'CHECK OUT'}
+                  {isCheckIn ? 'CHECK IN' : 'CHECK OUT'}
                 </Text>
               </View>
               <Text style={styles.timeText}>{formatTime(item.timestamp)}</Text>
@@ -71,19 +72,22 @@ export function HistoryScreen() {
 
             <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
 
-            {item.address && (
-              <Text style={styles.addressText} numberOfLines={1}>
-                📍 {item.address}
-              </Text>
-            )}
+            {item.address ? (
+              <View style={styles.locationRow}>
+                <MapPin size={11} color="#64748B" style={{ marginRight: 3, marginTop: 1 }} />
+                <Text style={styles.addressText} numberOfLines={1}>
+                  {item.address}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* Match Score */}
+          {/* AI Match Score */}
           <View style={styles.scoreContainer}>
             <Text style={styles.scoreNumber}>
               {Math.round(item.matchConfidence * 100)}%
             </Text>
-            <Text style={styles.scoreLabel}>Verified</Text>
+            <Text style={styles.scoreLabel}>AI Match</Text>
           </View>
         </View>
       </View>
@@ -91,64 +95,87 @@ export function HistoryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Attendance History</Text>
-        <Text style={styles.headerSubtitle}>Verified punch records & location logs</Text>
+        <View>
+          <Text style={styles.headerTitle}>Attendance History</Text>
+          <Text style={styles.headerSubtitle}>Verified punch records & location logs</Text>
+        </View>
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{records.length} logs</Text>
+        </View>
       </View>
 
       <FlatList
         data={records}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[styles.listContainer, { paddingBottom: Math.max(insets.bottom, 16) + 30 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={56} color={Colors.textTertiary} />
+            <Calendar size={48} color="#94A3B8" />
             <Text style={styles.emptyTitle}>No Attendance Records Yet</Text>
             <Text style={styles.emptySubtext}>Mark attendance from the punch screen to see your history.</Text>
           </View>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F1F5F9',
   },
   headerTitle: {
-    ...Typography.h2,
+    fontSize: 18,
+    fontWeight: '700',
     color: Colors.textPrimary,
+    letterSpacing: -0.4,
   },
   headerSubtitle: {
-    ...Typography.caption,
+    fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  countBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   listContainer: {
     padding: Spacing.md,
     flexGrow: 1,
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs + 2,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
     ...Shadows.sm,
   },
   cardMainRow: {
@@ -156,18 +183,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   thumbContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
     marginRight: Spacing.md,
   },
   thumbImage: {
-    width: 48,
-    height: 48,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  typeIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  typeCheckInBox: {
+    backgroundColor: '#ECFDF5',
+  },
+  typeCheckOutBox: {
+    backgroundColor: '#F0F9FF',
   },
   cardDetails: {
     flex: 1,
@@ -175,76 +211,79 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginRight: Spacing.sm,
+    gap: 8,
+    marginBottom: 2,
   },
   typeBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
+    borderRadius: 4,
   },
   typeCheckIn: {
-    backgroundColor: '#E6FFFA',
+    backgroundColor: '#DCFCE7',
   },
   typeCheckOut: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#E0F2FE',
   },
   typeBadgeText: {
     fontSize: 10,
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
   },
   textCheckIn: {
-    color: '#0D9488',
+    color: '#15803D',
   },
   textCheckOut: {
-    color: '#2563EB',
+    color: '#0369A1',
   },
   timeText: {
-    ...Typography.bodySemiBold,
+    fontSize: 12,
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   dateText: {
-    ...Typography.small,
+    fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginBottom: 2,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   addressText: {
-    ...Typography.small,
-    color: Colors.textTertiary,
-    marginTop: 2,
+    fontSize: 11,
+    color: '#64748B',
+    flex: 1,
   },
   scoreContainer: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    paddingLeft: 8,
   },
   scoreNumber: {
-    ...Typography.captionMedium,
-    color: '#0084FF',
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   scoreLabel: {
-    fontSize: 9,
-    color: Colors.textTertiary,
+    fontSize: 10,
+    color: '#94A3B8',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: Spacing.xxl * 2,
+    paddingVertical: 60,
   },
   emptyTitle: {
-    ...Typography.h3,
+    fontSize: 15,
+    fontWeight: '600',
     color: Colors.textPrimary,
-    marginTop: Spacing.md,
+    marginTop: 12,
   },
   emptySubtext: {
-    ...Typography.caption,
+    fontSize: 13,
     color: Colors.textSecondary,
-    marginTop: Spacing.xs,
     textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 32,
   },
 });

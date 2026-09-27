@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { MapPin, ScanFace } from 'lucide-react-native';
 import { Card } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
@@ -8,7 +9,6 @@ import { formatDateTime } from '../../utils/dateFormat';
 import { formatConfidence, formatCoordinates } from '../../utils/validators';
 import { resolvePhotoUri } from '../../services/fileSystem';
 import { Colors, Typography, Spacing } from '../../constants/theme';
-import { Ionicons } from '@expo/vector-icons';
 
 interface AttendanceCardProps {
   record: AttendanceRecord;
@@ -33,16 +33,16 @@ export const AttendanceCard: React.FC<AttendanceCardProps> = ({ record }) => {
 
       <View style={styles.details}>
         <View style={styles.detailRow}>
-          <Ionicons name="location-outline" size={16} color={Colors.text} style={styles.icon} />
+          <MapPin size={15} color={Colors.textSecondary} style={styles.icon} />
           <Text style={styles.detailText} numberOfLines={2}>
             {record.address || formatCoordinates(record.latitude, record.longitude)}
           </Text>
         </View>
         
         <View style={styles.detailRow}>
-          <Ionicons name="scan-outline" size={16} color={Colors.text} style={styles.icon} />
+          <ScanFace size={15} color={Colors.primary} style={styles.icon} />
           <Text style={styles.detailText}>
-            Match Confidence: {formatConfidence(record.matchConfidence)}
+            AI Match: {formatConfidence(record.matchConfidence)}
           </Text>
         </View>
       </View>
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   },
   time: {
     ...Typography.bodyMedium,
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   details: {
     marginTop: Spacing.xs,
@@ -79,12 +79,10 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginRight: Spacing.sm,
-    opacity: 0.6,
   },
   detailText: {
     ...Typography.caption,
-    color: Colors.text,
-    opacity: 0.8,
+    color: Colors.textSecondary,
     flex: 1,
   },
 });

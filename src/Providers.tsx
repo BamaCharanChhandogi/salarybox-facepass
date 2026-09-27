@@ -3,10 +3,10 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { DatabaseProvider, useDatabase } from '../context/DatabaseContext';
-import { AuthProvider } from '../context/AuthContext';
-import { RootNavigator } from '../navigation/RootNavigator';
-import { Colors } from '../constants/theme';
+import { DatabaseProvider, useDatabase } from './context/DatabaseContext';
+import { AuthProvider } from './context/AuthContext';
+import { RootNavigator } from './navigation/RootNavigator';
+import { Colors } from './constants/theme';
 
 const InnerApp = () => {
   const { isReady } = useDatabase();

@@ -4,13 +4,25 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  Alert, 
-  SafeAreaView, 
   ActivityIndicator,
   ScrollView,
-  Image
+  Image,
+  Modal
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { 
+  ScanFace, 
+  Camera, 
+  CheckCircle2, 
+  AlertCircle, 
+  Clock, 
+  MapPin, 
+  LogOut, 
+  Sparkles,
+  Calendar,
+  ShieldCheck,
+  Check
+} from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { CameraView } from '../../components/camera/CameraView';
@@ -21,7 +33,18 @@ import { saveSelfie, resolvePhotoUri } from '../../services/fileSystem';
 import { AttendanceType, AttendanceRecord } from '../../types';
 import { formatTime, formatDate } from '../../utils/dateFormat';
 
+interface FeedbackState {
+  type: 'success' | 'mismatch' | 'not_enrolled' | 'error';
+  title: string;
+  message: string;
+  punchType?: AttendanceType;
+  time?: string;
+  confidence?: number;
+  location?: string;
+}
+
 export function AttendanceScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [showCamera, setShowCamera] = useState(false);
   const [attendanceType, setAttendanceType] = useState<AttendanceType>('check_in');
@@ -29,6 +52,9 @@ export function AttendanceScreen() {
   const [processingStatus, setProcessingStatus] = useState('Verifying Face with Face++ AI...');
   const [latestRecord, setLatestRecord] = useState<AttendanceRecord | null>(null);
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
+
+  // Subtle modern feedback modal
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -56,45 +82,49 @@ export function AttendanceScreen() {
 
     try {
       setProcessing(true);
-      setProcessingStatus('Checking biometric enrollment profile...');
+      setProcessingStatus('Checking biometric profile...');
 
       // 1. Check if user is enrolled
       const enrollment = await getFaceEnrollment(user.id);
       if (!enrollment || !enrollment.enrollmentPhotoUri) {
-        Alert.alert(
-          'Face Profile Not Enrolled',
-          'Your biometric face profile is not registered yet. Please request your Admin to enrol your face before marking attendance.'
-        );
         setProcessing(false);
+        setFeedback({
+          type: 'not_enrolled',
+          title: 'Biometrics Not Registered',
+          message: 'Your facial profile is not registered yet. Please request your Admin to enrol your face before punching attendance.'
+        });
         return;
       }
 
       // 2. Resolve enrolled photo file path
       const enrolledPhotoPath = resolvePhotoUri(enrollment.enrollmentPhotoUri);
       if (!enrolledPhotoPath) {
-        Alert.alert('Error', 'Enrolled face photo file could not be found.');
         setProcessing(false);
+        setFeedback({
+          type: 'error',
+          title: 'Enrollment Error',
+          message: 'The enrolled biometric profile image could not be loaded.'
+        });
         return;
       }
 
-      setProcessingStatus('Comparing selfie with enrolled face via Face++ AI...');
+      setProcessingStatus('Comparing selfie via Face++ AI...');
 
       // 3. Real Face++ 1:1 facial comparison
       const matchResult = await verifyFaceMatch(photoUri, enrolledPhotoPath);
 
       if (!matchResult.matched) {
-        const scoreText = matchResult.rawConfidence !== undefined 
-          ? `(Match Confidence: ${matchResult.rawConfidence.toFixed(1)}% / Required: 70%)` 
-          : '';
-        Alert.alert(
-          'Biometric Verification Failed ❌',
-          matchResult.error || `Your face did not match the registered profile ${scoreText}. Please face the camera directly in good lighting and try again.`
-        );
         setProcessing(false);
+        setFeedback({
+          type: 'mismatch',
+          title: 'Verification Unsuccessful',
+          message: matchResult.error || 'Your face did not match the registered profile. Please face the camera in good lighting and try again.',
+          confidence: matchResult.rawConfidence
+        });
         return;
       }
 
-      setProcessingStatus('Acquiring verified GPS coordinates & address...');
+      setProcessingStatus('Acquiring verified GPS coordinates...');
 
       // 4. Fetch GPS and reverse-geocoded location
       let location = { latitude: 0, longitude: 0, address: 'Unknown Location' };
@@ -107,10 +137,10 @@ export function AttendanceScreen() {
         };
       } catch (locErr) {
         console.warn('GPS location error:', locErr);
-        location.address = 'Location permission unavailable';
+        location.address = 'Location unavailable';
       }
 
-      setProcessingStatus('Saving attendance log and selfie snapshot...');
+      setProcessingStatus('Saving attendance snapshot...');
 
       // 5. Save selfie locally
       const savedSelfieRelativePath = await saveSelfie(user.id, photoUri);
@@ -126,22 +156,27 @@ export function AttendanceScreen() {
         location.address
       );
 
-      // 7. Show success confirmation
-      const actionName = attendanceType === 'check_in' ? 'Check In' : 'Check Out';
-      Alert.alert(
-        'Attendance Verified! ✅',
-        `${actionName} recorded successfully.\n\n` +
-        `• Time: ${formatTime(new Date().toISOString())}\n` +
-        `• Match Score: ${(matchResult.rawConfidence ?? 90).toFixed(1)}%\n` +
-        `• Location: ${location.address}`,
-        [{ text: 'OK' }]
-      );
+      // 7. Show elegant success feedback modal
+      const now = new Date();
+      setFeedback({
+        type: 'success',
+        title: 'Attendance Verified',
+        message: `${attendanceType === 'check_in' ? 'Check In' : 'Check Out'} recorded successfully with 1:1 biometric match.`,
+        punchType: attendanceType,
+        time: formatTime(now.toISOString()),
+        confidence: matchResult.rawConfidence ?? 90,
+        location: location.address
+      });
 
       loadAttendanceData();
 
     } catch (error: any) {
       console.error('[Attendance] Verification error:', error);
-      Alert.alert('Attendance Error', error.message || 'Verification process failed');
+      setFeedback({
+        type: 'error',
+        title: 'Attendance Error',
+        message: error.message || 'Verification process encountered an unexpected issue.'
+      });
     } finally {
       setProcessing(false);
     }
@@ -153,7 +188,7 @@ export function AttendanceScreen() {
         onCapture={handleCapture} 
         onClose={() => setShowCamera(false)}
         mode="verify" 
-        promptMessage="Align your face to verify and punch"
+        promptMessage="Center face inside oval to verify"
       />
     );
   }
@@ -162,119 +197,132 @@ export function AttendanceScreen() {
     new Date(latestRecord.timestamp).toDateString() === new Date().toDateString() &&
     latestRecord.type === 'check_in';
 
+  const today = new Date();
+  const dayName = today.toLocaleDateString('en-US', { weekday: 'short' });
+  const dayNumber = today.getDate();
+  const monthName = today.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 30 }]}>
+        
         {/* Top Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.headerInfo}>
             <Text style={styles.greetingText}>Welcome back,</Text>
             <Text style={styles.userNameText}>{user?.name}</Text>
-            <Text style={styles.empIdBadge}>ID: {user?.employeeId}</Text>
+            <View style={styles.badgeRow}>
+              <View style={styles.empIdBadge}>
+                <Text style={styles.empIdBadgeText}>ID: {user?.employeeId}</Text>
+              </View>
+              <View style={styles.statusPill}>
+                <View style={[styles.statusDot, isCheckedInToday ? styles.statusDotActive : styles.statusDotInactive]} />
+                <Text style={styles.statusPillText}>
+                  {isCheckedInToday ? 'Checked In' : 'Pending Punch'}
+                </Text>
+              </View>
+            </View>
           </View>
+
           <View style={styles.dateBox}>
-            <Text style={styles.dateDay}>{new Date().getDate()}</Text>
-            <Text style={styles.dateMonth}>
-              {new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase()}
-            </Text>
+            <Text style={styles.dateDay}>{dayNumber}</Text>
+            <Text style={styles.dateMonth}>{monthName}</Text>
           </View>
         </View>
 
-        {/* Live Attendance Status Card */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusIndicator, isCheckedInToday ? styles.statusGreen : styles.statusAmber]} />
-            <Text style={styles.statusCardTitle}>
-              {isCheckedInToday ? 'Currently Checked In' : 'Not Checked In Today'}
-            </Text>
-          </View>
-          {latestRecord ? (
-            <Text style={styles.statusSubtext}>
-              Last punch: {latestRecord.type === 'check_in' ? 'Check In' : 'Check Out'} at {formatTime(latestRecord.timestamp)} ({formatDate(latestRecord.timestamp)})
-            </Text>
-          ) : (
-            <Text style={styles.statusSubtext}>No attendance logged yet today.</Text>
-          )}
-        </View>
-
-        {/* Biometric Punch Action Cards */}
-        <Text style={styles.sectionHeader}>Mark Your Attendance</Text>
+        {/* Punch CTAs Grid */}
+        <Text style={styles.sectionHeader}>Biometric Attendance</Text>
         <View style={styles.actionGrid}>
+          
+          {/* Check In Card */}
           <TouchableOpacity 
-            style={[styles.punchButton, styles.checkInGradient]}
+            style={[styles.punchCard, styles.checkInCard]}
             onPress={() => handleStartAttendance('check_in')}
             activeOpacity={0.85}
           >
-            <View style={styles.punchIconCircle}>
-              <Ionicons name="scan" size={28} color="#00D2B4" />
+            <View style={styles.punchIconCircleCheckIn}>
+              <ScanFace size={26} color="#0D9488" />
             </View>
-            <Text style={styles.punchButtonTitle}>Punch Check In</Text>
-            <Text style={styles.punchButtonSubtitle}>Selfie + GPS verification</Text>
+            <Text style={styles.punchTitle}>Punch Check In</Text>
+            <Text style={styles.punchSubtitle}>Selfie + GPS verification</Text>
           </TouchableOpacity>
 
+          {/* Check Out Card */}
           <TouchableOpacity 
-            style={[styles.punchButton, styles.checkOutGradient]}
+            style={[styles.punchCard, styles.checkOutCard]}
             onPress={() => handleStartAttendance('check_out')}
             activeOpacity={0.85}
           >
-            <View style={styles.punchIconCircle}>
-              <Ionicons name="log-out-outline" size={28} color="#0084FF" />
+            <View style={styles.punchIconCircleCheckOut}>
+              <LogOut size={24} color="#0284C7" />
             </View>
-            <Text style={styles.punchButtonTitle}>Punch Check Out</Text>
-            <Text style={styles.punchButtonSubtitle}>Selfie + GPS verification</Text>
+            <Text style={styles.punchTitle}>Punch Check Out</Text>
+            <Text style={styles.punchSubtitle}>Selfie + GPS verification</Text>
           </TouchableOpacity>
+
         </View>
 
         {/* Recent Attendance Activity */}
         <View style={styles.historyHeaderRow}>
-          <Text style={styles.sectionHeader}>Recent Punches</Text>
-          <Text style={styles.historySubheader}>Last 5 activity logs</Text>
+          <Text style={styles.sectionHeader}>Recent Activity</Text>
+          <Text style={styles.historySubheader}>Last 5 logs</Text>
         </View>
 
         {recentRecords.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Ionicons name="time-outline" size={36} color={Colors.textTertiary} />
-            <Text style={styles.emptyText}>No recent punch records found</Text>
+            <Clock size={36} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Activity Recorded</Text>
+            <Text style={styles.emptySubtitle}>Punch check in to log your attendance for today.</Text>
           </View>
         ) : (
           recentRecords.map((record) => {
             const resolvedSelfie = resolvePhotoUri(record.selfieUri);
+            const isCheckIn = record.type === 'check_in';
             return (
               <View key={record.id} style={styles.historyCard}>
                 <View style={styles.historyThumbBox}>
                   {resolvedSelfie ? (
                     <Image source={{ uri: resolvedSelfie }} style={styles.historyThumb} />
                   ) : (
-                    <Ionicons name="person-circle-outline" size={40} color={Colors.textSecondary} />
+                    <View style={[styles.typeIconFallback, isCheckIn ? styles.checkInIcon : styles.checkOutIcon]}>
+                      <Clock size={18} color={isCheckIn ? '#059669' : '#0284C7'} />
+                    </View>
                   )}
                 </View>
+
                 <View style={styles.historyDetails}>
                   <View style={styles.historyBadgeRow}>
                     <View style={[
                       styles.typePill, 
-                      record.type === 'check_in' ? styles.typeCheckIn : styles.typeCheckOut
+                      isCheckIn ? styles.typeCheckIn : styles.typeCheckOut
                     ]}>
                       <Text style={[
                         styles.typePillText,
-                        record.type === 'check_in' ? styles.typeCheckInText : styles.typeCheckOutText
+                        isCheckIn ? styles.typeCheckInText : styles.typeCheckOutText
                       ]}>
-                        {record.type === 'check_in' ? 'CHECK IN' : 'CHECK OUT'}
+                        {isCheckIn ? 'CHECK IN' : 'CHECK OUT'}
                       </Text>
                     </View>
                     <Text style={styles.historyTime}>{formatTime(record.timestamp)}</Text>
                   </View>
+
                   <Text style={styles.historyDate}>{formatDate(record.timestamp)}</Text>
+                  
                   {record.address && (
-                    <Text style={styles.historyAddress} numberOfLines={1}>
-                      📍 {record.address}
-                    </Text>
+                    <View style={styles.locationRow}>
+                      <MapPin size={11} color="#64748B" style={{ marginRight: 3, marginTop: 1 }} />
+                      <Text style={styles.historyAddress} numberOfLines={1}>
+                        {record.address}
+                      </Text>
+                    </View>
                   )}
                 </View>
+
                 <View style={styles.matchScoreBadge}>
                   <Text style={styles.matchScoreText}>
                     {Math.round(record.matchConfidence * 100)}%
                   </Text>
-                  <Text style={styles.matchScoreLabel}>AI match</Text>
+                  <Text style={styles.matchScoreLabel}>Match</Text>
                 </View>
               </View>
             );
@@ -282,7 +330,7 @@ export function AttendanceScreen() {
         )}
       </ScrollView>
 
-      {/* Processing Loader Modal */}
+      {/* Processing Loader Overlay */}
       {processing && (
         <View style={styles.processingOverlay}>
           <View style={styles.processingCard}>
@@ -292,14 +340,110 @@ export function AttendanceScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+
+      {/* Subtle, Elegant Feedback Modal */}
+      <Modal
+        visible={!!feedback}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            
+            {/* Modal Icon */}
+            {feedback?.type === 'success' && (
+              <View style={styles.modalIconCircleSuccess}>
+                <CheckCircle2 size={36} color="#0D9488" />
+              </View>
+            )}
+            {feedback?.type === 'mismatch' && (
+              <View style={styles.modalIconCircleMismatch}>
+                <AlertCircle size={36} color="#E11D48" />
+              </View>
+            )}
+            {feedback?.type === 'not_enrolled' && (
+              <View style={styles.modalIconCircleWarning}>
+                <ScanFace size={36} color="#D97706" />
+              </View>
+            )}
+            {feedback?.type === 'error' && (
+              <View style={styles.modalIconCircleMismatch}>
+                <AlertCircle size={36} color="#E11D48" />
+              </View>
+            )}
+
+            <Text style={styles.modalTitle}>{feedback?.title}</Text>
+            <Text style={styles.modalSubtitle}>{feedback?.message}</Text>
+
+            {/* Success Details Box */}
+            {feedback?.type === 'success' && (
+              <View style={styles.receiptBox}>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>Punch Type</Text>
+                  <Text style={styles.receiptValue}>
+                    {feedback.punchType === 'check_in' ? 'Check In' : 'Check Out'}
+                  </Text>
+                </View>
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>Time Logged</Text>
+                  <Text style={styles.receiptValue}>{feedback.time}</Text>
+                </View>
+
+                {feedback.confidence !== undefined && (
+                  <View style={styles.receiptRow}>
+                    <Text style={styles.receiptLabel}>Biometric Match</Text>
+                    <Text style={[styles.receiptValue, { color: '#0D9488', fontWeight: '700' }]}>
+                      {feedback.confidence.toFixed(0)}%
+                    </Text>
+                  </View>
+                )}
+
+                {feedback.location && (
+                  <View style={styles.receiptLocationRow}>
+                    <MapPin size={12} color="#64748B" style={{ marginRight: 4, marginTop: 2 }} />
+                    <Text style={styles.receiptLocationText} numberOfLines={2}>
+                      {feedback.location}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Mismatch Details */}
+            {feedback?.type === 'mismatch' && feedback.confidence !== undefined && (
+              <View style={styles.mismatchPill}>
+                <Text style={styles.mismatchPillText}>
+                  Match Score: {feedback.confidence.toFixed(0)}% (Threshold: 70%)
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity 
+              style={[
+                styles.modalActionBtn,
+                feedback?.type === 'mismatch' ? styles.modalActionBtnWarning : styles.modalActionBtnPrimary
+              ]}
+              onPress={() => setFeedback(null)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalActionBtnText}>
+                {feedback?.type === 'mismatch' ? 'Try Again' : 'Done'}
+              </Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     padding: Spacing.md,
@@ -308,83 +452,100 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     ...Shadows.sm,
   },
   headerInfo: {
     flex: 1,
   },
   greetingText: {
-    ...Typography.caption,
+    fontSize: 13,
     color: Colors.textSecondary,
+    fontWeight: '500',
   },
   userNameText: {
-    ...Typography.h2,
+    fontSize: 20,
+    fontWeight: '700',
     color: Colors.textPrimary,
+    letterSpacing: -0.5,
     marginTop: 2,
   },
-  empIdBadge: {
-    ...Typography.smallMedium,
-    color: Colors.primary,
-    marginTop: 4,
-  },
-  dateBox: {
-    backgroundColor: '#F0F9FF',
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-  },
-  dateDay: {
-    ...Typography.h2,
-    color: Colors.primary,
-  },
-  dateMonth: {
-    ...Typography.smallMedium,
-    color: Colors.primaryDark,
-  },
-  statusCard: {
-    backgroundColor: 'white',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primary,
-    ...Shadows.sm,
-  },
-  statusRow: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
   },
-  statusIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: Spacing.sm,
+  empIdBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  statusGreen: {
-    backgroundColor: Colors.secondary,
+  empIdBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
   },
-  statusAmber: {
-    backgroundColor: '#F59E0B',
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 5,
   },
-  statusCardTitle: {
-    ...Typography.bodySemiBold,
-    color: Colors.textPrimary,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  statusSubtext: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 4,
+  statusDotActive: {
+    backgroundColor: '#10B981',
+  },
+  statusDotInactive: {
+    backgroundColor: '#94A3B8',
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  dateBox: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: BorderRadius.lg,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  dateDay: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.primary,
+    letterSpacing: -0.5,
+  },
+  dateMonth: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginTop: 1,
   },
   sectionHeader: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: Spacing.sm,
   },
   actionGrid: {
@@ -392,43 +553,48 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     marginBottom: Spacing.xl,
   },
-  punchButton: {
+  punchCard: {
     flex: 1,
-    backgroundColor: 'white',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    ...Shadows.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    borderWidth: 1.5,
+    ...Shadows.sm,
   },
-  checkInGradient: {
-    borderTopWidth: 4,
-    borderTopColor: '#00D2B4',
+  checkInCard: {
+    borderColor: '#CCFBF1',
   },
-  checkOutGradient: {
-    borderTopWidth: 4,
-    borderTopColor: '#0084FF',
+  checkOutCard: {
+    borderColor: '#E0F2FE',
   },
-  punchIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#F8FAFC',
+  punchIconCircleCheckIn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0FDFA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 10,
   },
-  punchButtonTitle: {
-    ...Typography.bodySemiBold,
+  punchIconCircleCheckOut: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0F9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  punchTitle: {
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.textPrimary,
-    textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  punchButtonSubtitle: {
-    ...Typography.small,
+  punchSubtitle: {
+    fontSize: 11,
     color: Colors.textSecondary,
-    marginTop: 2,
-    textAlign: 'center',
+    marginTop: 3,
   },
   historyHeaderRow: {
     flexDirection: 'row',
@@ -437,31 +603,42 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   historySubheader: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: '#94A3B8',
   },
   historyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs + 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     ...Shadows.sm,
   },
   historyThumbBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginRight: Spacing.md,
   },
   historyThumb: {
-    width: 48,
-    height: 48,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  typeIconFallback: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkInIcon: {
+    backgroundColor: '#ECFDF5',
+  },
+  checkOutIcon: {
+    backgroundColor: '#F0F9FF',
   },
   historyDetails: {
     flex: 1,
@@ -469,69 +646,81 @@ const styles = StyleSheet.create({
   historyBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: 8,
+    marginBottom: 2,
   },
   typePill: {
-    paddingHorizontal: Spacing.xs + 2,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
+    borderRadius: 4,
   },
   typeCheckIn: {
-    backgroundColor: '#E6FFFA',
+    backgroundColor: '#DCFCE7',
   },
   typeCheckOut: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#E0F2FE',
   },
   typePillText: {
     fontSize: 10,
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
   },
   typeCheckInText: {
-    color: '#0D9488',
+    color: '#15803D',
   },
   typeCheckOutText: {
-    color: '#2563EB',
+    color: '#0369A1',
   },
   historyTime: {
-    ...Typography.bodySemiBold,
+    fontSize: 12,
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   historyDate: {
-    ...Typography.small,
+    fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginBottom: 2,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   historyAddress: {
-    ...Typography.small,
-    color: Colors.textTertiary,
-    marginTop: 2,
+    fontSize: 11,
+    color: '#64748B',
+    flex: 1,
   },
   matchScoreBadge: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: BorderRadius.sm,
+    paddingLeft: 8,
   },
   matchScoreText: {
-    ...Typography.captionMedium,
+    fontSize: 14,
+    fontWeight: '700',
     color: Colors.primary,
   },
   matchScoreLabel: {
-    fontSize: 9,
-    color: Colors.textTertiary,
+    fontSize: 10,
+    color: '#94A3B8',
   },
   emptyCard: {
-    backgroundColor: 'white',
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    paddingVertical: Spacing.xl,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  emptyText: {
-    ...Typography.caption,
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: Spacing.sm,
+    marginTop: 2,
   },
   processingOverlay: {
     position: 'absolute',
@@ -539,29 +728,158 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
     padding: Spacing.xl,
   },
   processingCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     width: '85%',
     ...Shadows.lg,
   },
   processingTitle: {
-    ...Typography.h3,
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginTop: Spacing.md,
   },
   processingSubtitle: {
-    ...Typography.caption,
+    fontSize: 13,
     color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+    marginTop: 4,
     textAlign: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    width: '90%',
+    maxWidth: 380,
+    alignItems: 'center',
+    ...Shadows.lg,
+  },
+  modalIconCircleSuccess: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#CCFBF1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalIconCircleMismatch: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#FFE4E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalIconCircleWarning: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: Spacing.md,
+  },
+  receiptBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: Spacing.lg,
+    gap: 8,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  receiptLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  receiptValue: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  receiptLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 8,
+    marginTop: 2,
+  },
+  receiptLocationText: {
+    fontSize: 11,
+    color: '#64748B',
+    flex: 1,
+    lineHeight: 16,
+  },
+  mismatchPill: {
+    backgroundColor: '#FFF1F2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
+    marginBottom: Spacing.lg,
+  },
+  mismatchPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#E11D48',
+  },
+  modalActionBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+  },
+  modalActionBtnPrimary: {
+    backgroundColor: Colors.primary,
+  },
+  modalActionBtnWarning: {
+    backgroundColor: '#0F172A',
+  },
+  modalActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

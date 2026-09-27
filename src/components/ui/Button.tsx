@@ -1,6 +1,5 @@
 import React from 'react';
 import { Pressable, Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 
 export interface ButtonProps {
@@ -10,7 +9,7 @@ export interface ButtonProps {
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   disabled?: boolean;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: React.ReactNode;
   fullWidth?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
@@ -29,7 +28,7 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
 }) => {
   const getContainerStyle = (pressed: boolean) => {
-    const baseStyle = [styles.container, styles[`${size}Container`], fullWidth && styles.fullWidth];
+    const baseStyle: any[] = [styles.container, styles[`${size}Container`], fullWidth && styles.fullWidth];
     
     if (disabled || loading) {
       if (variant === 'outline' || variant === 'ghost') {
@@ -39,14 +38,14 @@ export const Button: React.FC<ButtonProps> = ({
     }
     
     if (pressed) {
-      baseStyle.push({ opacity: 0.8 } as any);
+      baseStyle.push({ opacity: 0.85 });
     }
 
     return [...baseStyle, styles[`${variant}Container`]];
   };
 
   const getTextStyle = () => {
-    const baseStyle = [styles.text, styles[`${size}Text`]];
+    const baseStyle: any[] = [styles.text, styles[`${size}Text`]];
     if (disabled || loading) {
       if (variant === 'outline' || variant === 'ghost') {
         return [...baseStyle, styles[`${variant}Text`]];
@@ -65,19 +64,12 @@ export const Button: React.FC<ButtonProps> = ({
       <View style={styles.content}>
         {loading ? (
           <ActivityIndicator 
-            color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.surface} 
+            color={variant === 'outline' || variant === 'ghost' ? Colors.primary : '#FFFFFF'} 
             size="small" 
           />
         ) : (
           <>
-            {icon && (
-              <Ionicons
-                name={icon}
-                size={size === 'sm' ? 16 : size === 'lg' ? 24 : 20}
-                color={(StyleSheet.flatten(getTextStyle()) as any)?.color || Colors.primary}
-                style={styles.icon}
-              />
-            )}
+            {icon && <View style={styles.iconContainer}>{icon}</View>}
             <Text style={[getTextStyle(), textStyle]}>{title}</Text>
           </>
         )}
@@ -90,7 +82,7 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     flexDirection: 'row',
   },
   content: {
@@ -101,63 +93,57 @@ const styles = StyleSheet.create({
   fullWidth: {
     width: '100%',
   },
-  // Sizes
   smContainer: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   mdContainer: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
   },
   lgContainer: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
-  // Variants (Containers)
   primaryContainer: {
     backgroundColor: Colors.primary,
   },
   secondaryContainer: {
     backgroundColor: Colors.secondary,
   },
-  dangerContainer: {
-    backgroundColor: Colors.error,
-  },
   outlineContainer: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.primary,
   },
   ghostContainer: {
     backgroundColor: 'transparent',
   },
-  disabledContainer: {
-    backgroundColor: Colors.text + '40', // light grey
+  dangerContainer: {
+    backgroundColor: Colors.error,
   },
-  // Typography
+  disabledContainer: {
+    backgroundColor: '#CBD5E1',
+  },
   text: {
     ...Typography.button,
     textAlign: 'center',
+    letterSpacing: -0.2,
   },
   smText: {
-    fontSize: 14,
+    fontSize: 13,
   },
   mdText: {
-    fontSize: 16,
+    fontSize: 15,
   },
   lgText: {
-    fontSize: 18,
+    fontSize: 16,
   },
-  // Variants (Text)
   primaryText: {
-    color: Colors.surface,
+    color: '#FFFFFF',
   },
   secondaryText: {
-    color: Colors.surface,
-  },
-  dangerText: {
-    color: Colors.surface,
+    color: '#0F172A',
   },
   outlineText: {
     color: Colors.primary,
@@ -165,10 +151,13 @@ const styles = StyleSheet.create({
   ghostText: {
     color: Colors.primary,
   },
-  disabledText: {
-    color: Colors.surface,
+  dangerText: {
+    color: '#FFFFFF',
   },
-  icon: {
-    marginRight: Spacing.xs,
+  disabledText: {
+    color: '#94A3B8',
+  },
+  iconContainer: {
+    marginRight: 8,
   },
 });

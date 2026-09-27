@@ -1,187 +1,506 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  RefreshControl,
+  TextInput,
+  Image
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import { 
+  Users, 
+  UserCheck, 
+  Clock, 
+  Plus, 
+  Search, 
+  X, 
+  CheckCircle2, 
+  AlertCircle, 
+  ChevronRight,
+  LogOut,
+  User as UserIcon
+} from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
-import { getTotalStaffCount, getEnrolledCount, getTodayAttendanceCount } from '../../services/database';
+import { 
+  getTotalStaffCount, 
+  getEnrolledCount, 
+  getTodayAttendanceCount, 
+  getAllStaff 
+} from '../../services/database';
+import { resolvePhotoUri } from '../../services/fileSystem';
 import { useAuth } from '../../context/AuthContext';
-import { AdminStackParamList } from '../../types';
+import { AdminStackParamList, StaffWithEnrollment } from '../../types';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList, 'Dashboard'>;
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const topSpacing = Math.max(insets.top, 24) + Spacing.sm;
+  
   const [stats, setStats] = useState({ total: 0, enrolled: 0, today: 0 });
+  const [staff, setStaff] = useState<StaffWithEnrollment[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'enrolled' | 'pending'>('all');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadStats();
-    }, [])
-  );
-
-  const loadStats = async () => {
+  const loadAllData = async () => {
     try {
-      setLoading(true);
-      const total = await getTotalStaffCount();
-      const enrolled = await getEnrolledCount();
-      const today = await getTodayAttendanceCount();
+      const [total, enrolled, today, staffList] = await Promise.all([
+        getTotalStaffCount(),
+        getEnrolledCount(),
+        getTodayAttendanceCount(),
+        getAllStaff()
+      ]);
       setStats({ total, enrolled, today });
+      setStaff(staffList);
     } catch (error) {
-      console.error('Failed to load stats:', error);
+      console.error('Failed to load admin dashboard data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const renderStatCard = (title: string, value: number, icon: keyof typeof Ionicons.glyphMap, color: string) => (
-    <View style={styles.statCard}>
-      <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={24} color={color} />
+  useFocusEffect(
+    useCallback(() => {
+      loadAllData();
+    }, [])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadAllData();
+  };
+
+  // Filter staff by search and tab
+  const filteredStaff = staff.filter(item => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = item.name.toLowerCase().includes(q) || item.employeeId.toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+
+    if (activeFilter === 'enrolled') return item.isEnrolled;
+    if (activeFilter === 'pending') return !item.isEnrolled;
+    return true;
+  });
+
+  const renderHeader = () => (
+    <View style={[styles.headerSection, { paddingTop: topSpacing }]}>
+      {/* Top Greeting Bar */}
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.welcomeText}>WORKSPACE ADMIN</Text>
+          <Text style={styles.adminNameText}>{user?.name || 'Administrator'}</Text>
+        </View>
+        <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8} hitSlop={8}>
+          <LogOut size={16} color={Colors.textSecondary} style={{ marginRight: 4 }} />
+          <Text style={styles.logoutBtnText}>Exit</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statTitle}>{title}</Text>
+
+      {/* Summary KPI Cards */}
+      <View style={styles.kpiGrid}>
+        <View style={styles.kpiCard}>
+          <View style={[styles.kpiIconWrap, { backgroundColor: '#EFF6FF' }]}>
+            <Users size={18} color="#0084FF" />
+          </View>
+          <Text style={styles.kpiValue}>{stats.total}</Text>
+          <Text style={styles.kpiLabel}>Total Staff</Text>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.kpiIconWrap, { backgroundColor: '#ECFDF5' }]}>
+            <UserCheck size={18} color="#10B981" />
+          </View>
+          <Text style={styles.kpiValue}>{stats.enrolled}</Text>
+          <Text style={styles.kpiLabel}>Faces Enrolled</Text>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.kpiIconWrap, { backgroundColor: '#F0FDFA' }]}>
+            <Clock size={18} color="#0D9488" />
+          </View>
+          <Text style={styles.kpiValue}>{stats.today}</Text>
+          <Text style={styles.kpiLabel}>Punches Today</Text>
+        </View>
+      </View>
+
+      {/* Staff Directory Header */}
+      <View style={styles.directoryHeaderRow}>
+        <View>
+          <Text style={styles.directoryTitle}>Staff Directory</Text>
+          <Text style={styles.directorySubtitle}>{filteredStaff.length} employees</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.addStaffHeaderBtn}
+          onPress={() => navigation.navigate('AddStaff')}
+          activeOpacity={0.85}
+        >
+          <Plus size={16} color="white" style={{ marginRight: 4 }} />
+          <Text style={styles.addStaffHeaderText}>Add Staff</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Search Input Bar */}
+      <View style={styles.searchBar}>
+        <Search size={16} color={Colors.textTertiary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search staff by name or employee ID..."
+          placeholderTextColor={Colors.textTertiary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <X size={16} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.filterTabsRow}>
+        {(['all', 'enrolled', 'pending'] as const).map((filter) => {
+          const isActive = activeFilter === filter;
+          const label = filter === 'all' ? 'All Staff' : filter === 'enrolled' ? 'Enrolled' : 'Pending Face';
+          return (
+            <TouchableOpacity
+              key={filter}
+              style={[styles.filterTab, isActive && styles.filterTabActive]}
+              onPress={() => setActiveFilter(filter)}
+            >
+              <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 
+  const renderStaffItem = ({ item }: { item: StaffWithEnrollment }) => {
+    const photoUri = resolvePhotoUri(item.enrollmentPhotoUri);
+
+    return (
+      <TouchableOpacity 
+        style={styles.staffCard}
+        onPress={() => navigation.navigate('StaffProfile', { staffId: item.id })}
+        activeOpacity={0.85}
+      >
+        <View style={styles.avatarWrap}>
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={styles.avatarImg} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <UserIcon size={20} color={Colors.textSecondary} />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.staffDetails}>
+          <Text style={styles.staffName}>{item.name}</Text>
+          <Text style={styles.employeeId}>ID: {item.employeeId}</Text>
+        </View>
+
+        <View style={[
+          styles.badge, 
+          item.isEnrolled ? styles.badgeEnrolled : styles.badgePending
+        ]}>
+          {item.isEnrolled ? (
+            <CheckCircle2 size={12} color="#059669" style={{ marginRight: 3 }} />
+          ) : (
+            <AlertCircle size={12} color="#D97706" style={{ marginRight: 3 }} />
+          )}
+          <Text style={[
+            styles.badgeText, 
+            item.isEnrolled ? styles.badgeTextEnrolled : styles.badgeTextPending
+          ]}>
+            {item.isEnrolled ? 'Enrolled' : 'Pending'}
+          </Text>
+        </View>
+
+        <ChevronRight size={16} color={Colors.textTertiary} style={{ marginLeft: 6 }} />
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.greeting}>Hello, {user?.name || 'Admin'}</Text>
-          <Text style={styles.subtitle}>Welcome to SalaryBox Admin</Text>
+    <View style={styles.container}>
+      {loading && !refreshing ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
-
-        {loading ? (
-          <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
-        ) : (
-          <View style={styles.statsContainer}>
-            {renderStatCard('Total Staff', stats.total, 'people-outline', Colors.primary)}
-            {renderStatCard('Enrolled Faces', stats.enrolled, 'scan-outline', Colors.secondary)}
-            {renderStatCard("Today's Check-ins", stats.today, 'checkmark-circle-outline', Colors.success || '#10B981')}
-          </View>
-        )}
-
-        <View style={styles.actionsContainer}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionRow}>
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.primaryButton]} 
-              onPress={() => navigation.navigate('StaffList')}
-            >
-              <Ionicons name="people" size={24} color={Colors.surface} />
-              <Text style={styles.primaryButtonText}>Manage Staff</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.secondaryButton]} 
-              onPress={() => navigation.navigate('AddStaff')}
-            >
-              <Ionicons name="person-add" size={24} color={Colors.primary} />
-              <Text style={styles.secondaryButtonText}>Add Staff</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      ) : (
+        <FlatList
+          data={filteredStaff}
+          keyExtractor={(item) => item.id.toString()}
+          ListHeaderComponent={renderHeader}
+          renderItem={renderStaffItem}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) + 30 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Users size={40} color={Colors.textTertiary} />
+              <Text style={styles.emptyTitle}>
+                {searchQuery ? 'No matching staff members' : 'No staff members registered'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {searchQuery ? 'Try adjusting your search query' : 'Tap the "Add Staff" button to register your first employee.'}
+              </Text>
+            </View>
+          }
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   container: {
-    padding: Spacing.m,
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  header: {
-    marginBottom: Spacing.xl,
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  greeting: {
-    ...Typography.h1,
-    color: Colors.text,
+  listContent: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.xxl,
   },
-  subtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+  headerSection: {
+    paddingTop: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  loader: {
-    marginVertical: Spacing.xxl,
-  },
-  statsContainer: {
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  welcomeText: {
+    ...Typography.badge,
+    color: Colors.textTertiary,
+  },
+  adminNameText: {
+    ...Typography.h2,
+    color: Colors.textPrimary,
+    marginTop: 2,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  logoutBtnText: {
+    ...Typography.captionMedium,
+    color: Colors.textSecondary,
+  },
+  kpiGrid: {
+    flexDirection: 'row',
+    gap: Spacing.xs + 2,
     marginBottom: Spacing.xl,
   },
-  statCard: {
+  kpiCard: {
     flex: 1,
-    backgroundColor: Colors.surface,
-    padding: Spacing.m,
+    backgroundColor: 'white',
     borderRadius: BorderRadius.m,
-    marginHorizontal: Spacing.xs,
-    alignItems: 'center',
-    ...Shadows.small,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  kpiIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.s,
+    marginBottom: Spacing.sm,
   },
-  statValue: {
-    ...Typography.h2,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
+  kpiValue: {
+    ...Typography.h1,
+    fontSize: 20,
+    lineHeight: 24,
+    color: Colors.textPrimary,
   },
-  statTitle: {
+  kpiLabel: {
+    ...Typography.small,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  directoryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  directoryTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+  },
+  directorySubtitle: {
     ...Typography.caption,
     color: Colors.textSecondary,
-    textAlign: 'center',
+    marginTop: 1,
   },
-  actionsContainer: {
-    marginTop: Spacing.m,
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: Spacing.m,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    flex: 1,
+  addStaffHeaderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.m,
+    backgroundColor: '#0084FF',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
     borderRadius: BorderRadius.m,
-    marginHorizontal: Spacing.xs,
-    ...Shadows.small,
   },
-  primaryButton: {
-    backgroundColor: Colors.primary,
+  addStaffHeaderText: {
+    ...Typography.button,
+    fontSize: 13,
+    color: 'white',
   },
-  secondaryButton: {
-    backgroundColor: Colors.surface,
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: BorderRadius.m,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: Spacing.md,
+    height: 44,
+    marginBottom: Spacing.sm,
   },
-  primaryButtonText: {
-    ...Typography.button,
-    color: Colors.surface,
-    marginLeft: Spacing.s,
+  searchIcon: {
+    marginRight: Spacing.sm,
   },
-  secondaryButtonText: {
-    ...Typography.button,
-    color: Colors.primary,
-    marginLeft: Spacing.s,
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    paddingVertical: 0,
+  },
+  filterTabsRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  filterTab: {
+    paddingHorizontal: Spacing.sm + 4,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    backgroundColor: '#F1F5F9',
+  },
+  filterTabActive: {
+    backgroundColor: '#0084FF',
+  },
+  filterTabText: {
+    ...Typography.captionMedium,
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  filterTabTextActive: {
+    color: 'white',
+  },
+  staffCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: BorderRadius.m,
+    padding: Spacing.md,
+    marginBottom: Spacing.xs + 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
+  },
+  avatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginRight: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  avatarImg: {
+    width: 44,
+    height: 44,
+  },
+  avatarFallback: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staffDetails: {
+    flex: 1,
+  },
+  staffName: {
+    ...Typography.bodySemiBold,
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  employeeId: {
+    ...Typography.small,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+  },
+  badgeEnrolled: {
+    backgroundColor: '#ECFDF5',
+  },
+  badgePending: {
+    backgroundColor: '#FEF3C7',
+  },
+  badgeText: {
+    ...Typography.badge,
+    fontSize: 10,
+  },
+  badgeTextEnrolled: {
+    color: '#059669',
+  },
+  badgeTextPending: {
+    color: '#D97706',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xxl,
+  },
+  emptyTitle: {
+    ...Typography.bodySemiBold,
+    color: Colors.textPrimary,
+    marginTop: Spacing.md,
+  },
+  emptySubtitle: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.xl,
   },
 });
