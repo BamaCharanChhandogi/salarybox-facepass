@@ -142,6 +142,13 @@ export async function isEmployeeIdTaken(employeeId: string): Promise<boolean> {
   return (row?.cnt ?? 0) > 0;
 }
 
+export async function deleteStaffMember(userId: number): Promise<void> {
+  const database = getDb();
+  await database.runAsync('DELETE FROM attendance_records WHERE user_id = ?', [userId]);
+  await database.runAsync('DELETE FROM face_enrollments WHERE user_id = ?', [userId]);
+  await database.runAsync('DELETE FROM users WHERE id = ?', [userId]);
+}
+
 // ─── Face Enrollment Queries ──────────────────────────────────
 
 export async function enrollFace(

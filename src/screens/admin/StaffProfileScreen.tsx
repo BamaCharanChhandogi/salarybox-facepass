@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,10 +13,11 @@ import {
   Clock, 
   ShieldCheck, 
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
-import { getStaffById, getAttendanceForUser } from '../../services/database';
+import { getStaffById, getAttendanceForUser, deleteStaffMember } from '../../services/database';
 import { AdminStackParamList, StaffWithEnrollment, AttendanceRecord } from '../../types';
 import { resolvePhotoUri } from '../../services/fileSystem';
 
@@ -62,6 +63,29 @@ export default function StaffProfileScreen() {
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleDeleteStaff = () => {
+    if (!staff) return;
+    Alert.alert(
+      'Delete Staff Member',
+      `Are you sure you want to permanently remove ${staff.name} (${staff.employeeId})? This will delete their biometric profile and all attendance records.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Staff',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteStaffMember(staff.id);
+              navigation.goBack();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete staff member');
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading) {
@@ -235,6 +259,16 @@ export default function StaffProfileScreen() {
           )}
         </View>
 
+        {/* Delete Staff Member CTA */}
+        <TouchableOpacity 
+          style={styles.deleteStaffCta}
+          onPress={handleDeleteStaff}
+          activeOpacity={0.8}
+        >
+          <Trash2 size={16} color="#E11D48" style={{ marginRight: 6 }} />
+          <Text style={styles.deleteStaffCtaText}>Delete Staff Member</Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
@@ -244,6 +278,23 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  deleteStaffCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
+    borderRadius: BorderRadius.lg,
+    paddingVertical: 14,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.lg,
+  },
+  deleteStaffCtaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#E11D48',
   },
   container: {
     padding: Spacing.md,

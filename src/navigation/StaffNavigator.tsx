@@ -1,7 +1,8 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, View } from 'react-native';
+import { TouchableOpacity, StyleSheet, View, Text, Alert } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StaffStackParamList } from '../types';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { StaffStackParamList, StaffTabParamList } from '../types';
 import { Camera, Clock, LogOut } from 'lucide-react-native';
 import { Colors } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
@@ -9,11 +10,28 @@ import { useAuth } from '../context/AuthContext';
 // Import screens
 import { AttendanceScreen } from '../screens/staff/AttendanceScreen';
 import { HistoryScreen } from '../screens/staff/HistoryScreen';
+import BiometricPunchScreen from '../screens/staff/BiometricPunchScreen';
 
-const Tab = createBottomTabNavigator<StaffStackParamList>();
+const Tab = createBottomTabNavigator<StaffTabParamList>();
+const Stack = createNativeStackNavigator<StaffStackParamList>();
 
-export const StaffNavigator = () => {
+function StaffTabs() {
   const { logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out of your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+          onPress: logout 
+        }
+      ]
+    );
+  };
 
   return (
     <Tab.Navigator
@@ -45,8 +63,14 @@ export const StaffNavigator = () => {
           letterSpacing: -0.4,
         },
         headerRight: () => (
-          <TouchableOpacity onPress={logout} style={styles.logoutButton} hitSlop={10}>
-            <LogOut size={20} color={Colors.textSecondary} />
+          <TouchableOpacity 
+            onPress={handleLogout} 
+            style={styles.logoutButton} 
+            activeOpacity={0.8}
+            hitSlop={8}
+          >
+            <LogOut size={15} color="#64748B" style={{ marginRight: 4 }} />
+            <Text style={styles.logoutText}>Exit</Text>
           </TouchableOpacity>
         ),
       }}
@@ -75,13 +99,41 @@ export const StaffNavigator = () => {
       />
     </Tab.Navigator>
   );
+}
+
+export const StaffNavigator = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen 
+        name="StaffMainTabs" 
+        component={StaffTabs} 
+      />
+      <Stack.Screen 
+        name="BiometricPunch" 
+        component={BiometricPunchScreen as React.ComponentType<any>}
+        options={{
+          animation: 'slide_from_bottom',
+        }}
+      />
+    </Stack.Navigator>
+  );
 };
 
 const styles = StyleSheet.create({
   logoutButton: {
     marginRight: 16,
-    padding: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     borderRadius: 8,
     backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  logoutText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
 });

@@ -187,7 +187,7 @@ export function LoginScreen() {
                 <View style={styles.adminRoleRow}>
                   <Text style={styles.adminName}>Admin Portal</Text>
                   <View style={styles.adminBadge}>
-                    <Text style={styles.adminBadgeText}>SUPER ADMIN</Text>
+                    <Text style={styles.adminBadgeText}>ADMIN</Text>
                   </View>
                 </View>
                 <Text style={styles.adminDesc}>

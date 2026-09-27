@@ -81,6 +81,11 @@ export type AdminStackParamList = {
 };
 
 export type StaffStackParamList = {
+  StaffMainTabs: undefined;
+  BiometricPunch: { punchType: AttendanceType };
+};
+
+export type StaffTabParamList = {
   Attendance: undefined;
   History: undefined;
 };

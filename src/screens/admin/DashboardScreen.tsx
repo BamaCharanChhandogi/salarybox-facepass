@@ -8,7 +8,8 @@ import {
   ActivityIndicator, 
   RefreshControl,
   TextInput,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -24,6 +25,7 @@ import {
   AlertCircle, 
   ChevronRight,
   LogOut,
+  Trash2,
   User as UserIcon
 } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
@@ -31,7 +33,8 @@ import {
   getTotalStaffCount, 
   getEnrolledCount, 
   getTodayAttendanceCount, 
-  getAllStaff 
+  getAllStaff,
+  deleteStaffMember
 } from '../../services/database';
 import { resolvePhotoUri } from '../../services/fileSystem';
 import { useAuth } from '../../context/AuthContext';
@@ -92,16 +95,49 @@ export default function DashboardScreen() {
     return true;
   });
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out of the Admin Portal?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: logout },
+      ]
+    );
+  };
+
+  const handleConfirmDelete = (item: StaffWithEnrollment) => {
+    Alert.alert(
+      'Delete Staff Member',
+      `Are you sure you want to remove ${item.name} (${item.employeeId})? This will permanently delete their profile, face biometrics, and all attendance logs.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteStaffMember(item.id);
+              await loadAllData();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete staff member');
+            }
+          }
+        },
+      ]
+    );
+  };
+
   const renderHeader = () => (
     <View style={[styles.headerSection, { paddingTop: topSpacing }]}>
       {/* Top Greeting Bar */}
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.welcomeText}>WORKSPACE ADMIN</Text>
-          <Text style={styles.adminNameText}>{user?.name || 'Administrator'}</Text>
+          <Text style={styles.adminNameText}>Workspace Admin</Text>
+          <Text style={styles.welcomeText}>ADMIN001 • CONTROL & AUDIT</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8} hitSlop={8}>
-          <LogOut size={16} color={Colors.textSecondary} style={{ marginRight: 4 }} />
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8} hitSlop={8}>
+          <LogOut size={15} color="#64748B" style={{ marginRight: 4 }} />
           <Text style={styles.logoutBtnText}>Exit</Text>
         </TouchableOpacity>
       </View>
@@ -228,7 +264,18 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
-        <ChevronRight size={16} color={Colors.textTertiary} style={{ marginLeft: 6 }} />
+        <TouchableOpacity 
+          style={styles.deleteStaffBtn}
+          onPress={(e) => {
+            handleConfirmDelete(item);
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
+        >
+          <Trash2 size={16} color="#94A3B8" />
+        </TouchableOpacity>
+
+        <ChevronRight size={16} color={Colors.textTertiary} style={{ marginLeft: 2 }} />
       </TouchableOpacity>
     );
   };
@@ -502,5 +549,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     textAlign: 'center',
     paddingHorizontal: Spacing.xl,
+  },
+  deleteStaffBtn: {
+    padding: 6,
+    borderRadius: 6,
+    marginLeft: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

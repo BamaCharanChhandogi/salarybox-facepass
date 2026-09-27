@@ -1,204 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  ActivityIndicator,
   ScrollView,
-  Image,
-  Modal
+  Image
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { 
   ScanFace, 
-  Camera, 
-  CheckCircle2, 
-  AlertCircle, 
   Clock, 
   MapPin, 
-  LogOut, 
-  Sparkles,
-  Calendar,
-  ShieldCheck,
-  Check
+  LogOut,
+  ChevronRight
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
-import { CameraView } from '../../components/camera/CameraView';
-import { getFaceEnrollment, recordAttendance, getLatestAttendance, getAttendanceForUser } from '../../services/database';
-import { getCurrentLocation } from '../../services/location';
-import { verifyFaceMatch } from '../../services/faceRecognition';
-import { saveSelfie, resolvePhotoUri } from '../../services/fileSystem';
-import { AttendanceType, AttendanceRecord } from '../../types';
+import { getLatestAttendance, getAttendanceForUser } from '../../services/database';
+import { resolvePhotoUri } from '../../services/fileSystem';
+import { AttendanceType, AttendanceRecord, StaffStackParamList } from '../../types';
 import { formatTime, formatDate } from '../../utils/dateFormat';
 
-interface FeedbackState {
-  type: 'success' | 'mismatch' | 'not_enrolled' | 'error';
-  title: string;
-  message: string;
-  punchType?: AttendanceType;
-  time?: string;
-  confidence?: number;
-  location?: string;
-}
+type NavigationProp = NativeStackNavigationProp<StaffStackParamList>;
 
 export function AttendanceScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NavigationProp>();
   const { user } = useAuth();
-  const [showCamera, setShowCamera] = useState(false);
-  const [attendanceType, setAttendanceType] = useState<AttendanceType>('check_in');
-  const [processing, setProcessing] = useState(false);
-  const [processingStatus, setProcessingStatus] = useState('Verifying Face with Face++ AI...');
+  
   const [latestRecord, setLatestRecord] = useState<AttendanceRecord | null>(null);
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
 
-  // Subtle modern feedback modal
-  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      loadAttendanceData();
-    }
-  }, [user]);
-
-  const loadAttendanceData = async () => {
+  const loadAttendanceData = useCallback(async () => {
     if (user) {
       const latest = await getLatestAttendance(user.id);
       const recent = await getAttendanceForUser(user.id, 5);
       setLatestRecord(latest);
       setRecentRecords(recent);
     }
-  };
+  }, [user]);
+
+  // Automatically refresh latest records whenever returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      loadAttendanceData();
+    }, [loadAttendanceData])
+  );
 
   const handleStartAttendance = (type: AttendanceType) => {
-    setAttendanceType(type);
-    setShowCamera(true);
+    navigation.navigate('BiometricPunch', { punchType: type });
   };
-
-  const handleCapture = async (photoUri: string) => {
-    setShowCamera(false);
-    if (!user) return;
-
-    try {
-      setProcessing(true);
-      setProcessingStatus('Checking biometric profile...');
-
-      // 1. Check if user is enrolled
-      const enrollment = await getFaceEnrollment(user.id);
-      if (!enrollment || !enrollment.enrollmentPhotoUri) {
-        setProcessing(false);
-        setFeedback({
-          type: 'not_enrolled',
-          title: 'Biometrics Not Registered',
-          message: 'Your facial profile is not registered yet. Please request your Admin to enrol your face before punching attendance.'
-        });
-        return;
-      }
-
-      // 2. Resolve enrolled photo file path
-      const enrolledPhotoPath = resolvePhotoUri(enrollment.enrollmentPhotoUri);
-      if (!enrolledPhotoPath) {
-        setProcessing(false);
-        setFeedback({
-          type: 'error',
-          title: 'Enrollment Error',
-          message: 'The enrolled biometric profile image could not be loaded.'
-        });
-        return;
-      }
-
-      setProcessingStatus('Comparing selfie via Face++ AI...');
-
-      // 3. Real Face++ 1:1 facial comparison
-      const matchResult = await verifyFaceMatch(photoUri, enrolledPhotoPath);
-
-      if (!matchResult.matched) {
-        setProcessing(false);
-        setFeedback({
-          type: 'mismatch',
-          title: 'Verification Unsuccessful',
-          message: matchResult.error || 'Your face did not match the registered profile. Please face the camera in good lighting and try again.',
-          confidence: matchResult.rawConfidence
-        });
-        return;
-      }
-
-      setProcessingStatus('Acquiring verified GPS coordinates...');
-
-      // 4. Fetch GPS and reverse-geocoded location
-      let location = { latitude: 0, longitude: 0, address: 'Unknown Location' };
-      try {
-        const loc = await getCurrentLocation();
-        location = {
-          latitude: loc.latitude,
-          longitude: loc.longitude,
-          address: loc.address || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`
-        };
-      } catch (locErr) {
-        console.warn('GPS location error:', locErr);
-        location.address = 'Location unavailable';
-      }
-
-      setProcessingStatus('Saving attendance snapshot...');
-
-      // 5. Save selfie locally
-      const savedSelfieRelativePath = await saveSelfie(user.id, photoUri);
-
-      // 6. Record to SQLite Database
-      await recordAttendance(
-        user.id,
-        attendanceType,
-        savedSelfieRelativePath,
-        location.latitude,
-        location.longitude,
-        matchResult.confidence,
-        location.address
-      );
-
-      // 7. Show elegant success feedback modal
-      const now = new Date();
-      setFeedback({
-        type: 'success',
-        title: 'Attendance Verified',
-        message: `${attendanceType === 'check_in' ? 'Check In' : 'Check Out'} recorded successfully with 1:1 biometric match.`,
-        punchType: attendanceType,
-        time: formatTime(now.toISOString()),
-        confidence: matchResult.rawConfidence ?? 90,
-        location: location.address
-      });
-
-      loadAttendanceData();
-
-    } catch (error: any) {
-      console.error('[Attendance] Verification error:', error);
-      setFeedback({
-        type: 'error',
-        title: 'Attendance Error',
-        message: error.message || 'Verification process encountered an unexpected issue.'
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  if (showCamera) {
-    return (
-      <CameraView 
-        onCapture={handleCapture} 
-        onClose={() => setShowCamera(false)}
-        mode="verify" 
-        promptMessage="Center face inside oval to verify"
-      />
-    );
-  }
 
   const isCheckedInToday = latestRecord && 
     new Date(latestRecord.timestamp).toDateString() === new Date().toDateString() &&
     latestRecord.type === 'check_in';
 
   const today = new Date();
-  const dayName = today.toLocaleDateString('en-US', { weekday: 'short' });
   const dayNumber = today.getDate();
   const monthName = today.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
 
@@ -244,7 +104,6 @@ export function AttendanceScreen() {
               <ScanFace size={26} color="#0D9488" />
             </View>
             <Text style={styles.punchTitle}>Punch Check In</Text>
-            <Text style={styles.punchSubtitle}>Selfie + GPS verification</Text>
           </TouchableOpacity>
 
           {/* Check Out Card */}
@@ -257,7 +116,6 @@ export function AttendanceScreen() {
               <LogOut size={24} color="#0284C7" />
             </View>
             <Text style={styles.punchTitle}>Punch Check Out</Text>
-            <Text style={styles.punchSubtitle}>Selfie + GPS verification</Text>
           </TouchableOpacity>
 
         </View>
@@ -329,112 +187,6 @@ export function AttendanceScreen() {
           })
         )}
       </ScrollView>
-
-      {/* Processing Loader Overlay */}
-      {processing && (
-        <View style={styles.processingOverlay}>
-          <View style={styles.processingCard}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.processingTitle}>Verifying Biometrics</Text>
-            <Text style={styles.processingSubtitle}>{processingStatus}</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Subtle, Elegant Feedback Modal */}
-      <Modal
-        visible={!!feedback}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            
-            {/* Modal Icon */}
-            {feedback?.type === 'success' && (
-              <View style={styles.modalIconCircleSuccess}>
-                <CheckCircle2 size={36} color="#0D9488" />
-              </View>
-            )}
-            {feedback?.type === 'mismatch' && (
-              <View style={styles.modalIconCircleMismatch}>
-                <AlertCircle size={36} color="#E11D48" />
-              </View>
-            )}
-            {feedback?.type === 'not_enrolled' && (
-              <View style={styles.modalIconCircleWarning}>
-                <ScanFace size={36} color="#D97706" />
-              </View>
-            )}
-            {feedback?.type === 'error' && (
-              <View style={styles.modalIconCircleMismatch}>
-                <AlertCircle size={36} color="#E11D48" />
-              </View>
-            )}
-
-            <Text style={styles.modalTitle}>{feedback?.title}</Text>
-            <Text style={styles.modalSubtitle}>{feedback?.message}</Text>
-
-            {/* Success Details Box */}
-            {feedback?.type === 'success' && (
-              <View style={styles.receiptBox}>
-                <View style={styles.receiptRow}>
-                  <Text style={styles.receiptLabel}>Punch Type</Text>
-                  <Text style={styles.receiptValue}>
-                    {feedback.punchType === 'check_in' ? 'Check In' : 'Check Out'}
-                  </Text>
-                </View>
-
-                <View style={styles.receiptRow}>
-                  <Text style={styles.receiptLabel}>Time Logged</Text>
-                  <Text style={styles.receiptValue}>{feedback.time}</Text>
-                </View>
-
-                {feedback.confidence !== undefined && (
-                  <View style={styles.receiptRow}>
-                    <Text style={styles.receiptLabel}>Biometric Match</Text>
-                    <Text style={[styles.receiptValue, { color: '#0D9488', fontWeight: '700' }]}>
-                      {feedback.confidence.toFixed(0)}%
-                    </Text>
-                  </View>
-                )}
-
-                {feedback.location && (
-                  <View style={styles.receiptLocationRow}>
-                    <MapPin size={12} color="#64748B" style={{ marginRight: 4, marginTop: 2 }} />
-                    <Text style={styles.receiptLocationText} numberOfLines={2}>
-                      {feedback.location}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Mismatch Details */}
-            {feedback?.type === 'mismatch' && feedback.confidence !== undefined && (
-              <View style={styles.mismatchPill}>
-                <Text style={styles.mismatchPillText}>
-                  Match Score: {feedback.confidence.toFixed(0)}% (Threshold: 70%)
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity 
-              style={[
-                styles.modalActionBtn,
-                feedback?.type === 'mismatch' ? styles.modalActionBtnWarning : styles.modalActionBtnPrimary
-              ]}
-              onPress={() => setFeedback(null)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.modalActionBtnText}>
-                {feedback?.type === 'mismatch' ? 'Try Again' : 'Done'}
-              </Text>
-            </TouchableOpacity>
-
-          </View>
-        </View>
-      </Modal>
 
     </View>
   );
@@ -557,8 +309,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
+    padding: Spacing.lg,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
     ...Shadows.sm,
   },
   checkInCard: {
@@ -568,33 +323,29 @@ const styles = StyleSheet.create({
     borderColor: '#E0F2FE',
   },
   punchIconCircleCheckIn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#F0FDFA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   punchIconCircleCheckOut: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#F0F9FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   punchTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: Colors.textPrimary,
     letterSpacing: -0.3,
-  },
-  punchSubtitle: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 3,
+    textAlign: 'center',
   },
   historyHeaderRow: {
     flexDirection: 'row',
@@ -721,165 +472,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
-  },
-  processingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-    padding: Spacing.xl,
-  },
-  processingCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
-    alignItems: 'center',
-    width: '85%',
-    ...Shadows.lg,
-  },
-  processingTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginTop: Spacing.md,
-  },
-  processingSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
-    width: '90%',
-    maxWidth: 380,
-    alignItems: 'center',
-    ...Shadows.lg,
-  },
-  modalIconCircleSuccess: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#CCFBF1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  modalIconCircleMismatch: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#FFE4E6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  modalIconCircleWarning: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#FEF3C7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    letterSpacing: -0.4,
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: Spacing.md,
-  },
-  receiptBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: Spacing.lg,
-    gap: 8,
-  },
-  receiptRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  receiptLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  receiptValue: {
-    fontSize: 13,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  receiptLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingTop: 8,
-    marginTop: 2,
-  },
-  receiptLocationText: {
-    fontSize: 11,
-    color: '#64748B',
-    flex: 1,
-    lineHeight: 16,
-  },
-  mismatchPill: {
-    backgroundColor: '#FFF1F2',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FFE4E6',
-    marginBottom: Spacing.lg,
-  },
-  mismatchPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#E11D48',
-  },
-  modalActionBtn: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-  },
-  modalActionBtnPrimary: {
-    backgroundColor: Colors.primary,
-  },
-  modalActionBtnWarning: {
-    backgroundColor: '#0F172A',
-  },
-  modalActionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
   },
 });
