@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { resolvePhotoUri } from './fileSystem';
 
 const FACE_API_KEY = process.env.EXPO_PUBLIC_FACE_API_KEY || '8XvG4fDJOoX3Z0rhyns476B3ppHgsyjb';
@@ -27,10 +27,8 @@ export interface FaceCompareResult {
  */
 async function uriToBase64(uri: string): Promise<string> {
   const resolved = resolvePhotoUri(uri) || uri;
-  const base64 = await FileSystem.readAsStringAsync(resolved, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  return base64;
+  const file = new File(resolved);
+  return await file.base64();
 }
 
 /**

@@ -1,35 +1,36 @@
-import * as FileSystem from 'expo-file-system';
+import { Paths, File, Directory } from 'expo-file-system';
 import { FACE_PHOTOS_DIR, SELFIE_DIR } from '../constants/config';
 
 /**
  * Ensures required directories exist in the app's document storage.
  */
 export async function ensureDirectories(): Promise<void> {
-  const dirs = [
-    `${FileSystem.documentDirectory}${FACE_PHOTOS_DIR}`,
-    `${FileSystem.documentDirectory}${SELFIE_DIR}`,
-  ];
+  const faceDir = new Directory(Paths.document, FACE_PHOTOS_DIR);
+  if (!faceDir.exists) {
+    faceDir.create();
+  }
 
-  for (const dir of dirs) {
-    const info = await FileSystem.getInfoAsync(dir);
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-    }
+  const selfieDir = new Directory(Paths.document, SELFIE_DIR);
+  if (!selfieDir.exists) {
+    selfieDir.create();
   }
 }
 
 /**
  * Saves a face enrollment photo. Returns the relative path (for SQLite storage).
- * We store relative paths to avoid iOS document directory path changes on reinstall.
  */
 export async function saveFacePhoto(
   userId: number,
   sourceUri: string
 ): Promise<string> {
   await ensureDirectories();
-  const relativePath = `${FACE_PHOTOS_DIR}${userId}_${Date.now()}.jpg`;
-  const destUri = `${FileSystem.documentDirectory}${relativePath}`;
-  await FileSystem.copyAsync({ from: sourceUri, to: destUri });
+  const filename = `${userId}_${Date.now()}.jpg`;
+  const relativePath = `${FACE_PHOTOS_DIR}${filename}`;
+  
+  const source = new File(sourceUri);
+  const dest = new File(Paths.document, relativePath);
+  await source.copy(dest);
+
   return relativePath;
 }
 
@@ -41,9 +42,13 @@ export async function saveSelfie(
   sourceUri: string
 ): Promise<string> {
   await ensureDirectories();
-  const relativePath = `${SELFIE_DIR}${userId}_${Date.now()}.jpg`;
-  const destUri = `${FileSystem.documentDirectory}${relativePath}`;
-  await FileSystem.copyAsync({ from: sourceUri, to: destUri });
+  const filename = `${userId}_${Date.now()}.jpg`;
+  const relativePath = `${SELFIE_DIR}${filename}`;
+  
+  const source = new File(sourceUri);
+  const dest = new File(Paths.document, relativePath);
+  await source.copy(dest);
+
   return relativePath;
 }
 
@@ -56,18 +61,19 @@ export function resolvePhotoUri(relativePath: string | null | undefined): string
   if (relativePath.startsWith('file://') || relativePath.startsWith('content://')) {
     return relativePath;
   }
-  return `${FileSystem.documentDirectory}${relativePath}`;
+  const file = new File(Paths.document, relativePath);
+  return file.uri;
 }
 
 /**
  * Deletes a photo file by its relative path.
  */
 export async function deletePhoto(relativePath: string): Promise<void> {
-  const uri = resolvePhotoUri(relativePath);
-  if (uri) {
-    const info = await FileSystem.getInfoAsync(uri);
-    if (info.exists) {
-      await FileSystem.deleteAsync(uri);
+  const fullUri = resolvePhotoUri(relativePath);
+  if (fullUri) {
+    const file = new File(fullUri);
+    if (file.exists) {
+      file.delete();
     }
   }
 }
