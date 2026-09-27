@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "SalaryBox FacePass",
+    "slug": "salarybox-facepass",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "salarybox-facepass",
+    "android": {
+      "package": "com.salarybox.facepass",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.salarybox.facepass",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow SalaryBox FacePass to access the camera for face recognition.",
+        "NSLocationWhenInUseUsageDescription": "Allow SalaryBox FacePass to access your location for attendance verification."
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ],
+      "expo-font",
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow SalaryBox FacePass to access your location for attendance verification."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SalaryBox FacePass to access the camera for face recognition."
+        }
+      ]
+    ],
+    "owner": "bamacharanchhandogi"
+  }
+}
