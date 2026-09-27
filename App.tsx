@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { 
   useFonts, 
   Inter_400Regular, 
@@ -10,8 +10,8 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { Providers } from './src/app/Providers';
 
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+// Safely prevent auto hide (catch in Expo Go to avoid crashing)
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -23,13 +23,24 @@ export default function App() {
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
-      // Hide the splash screen once fonts are loaded
-      await SplashScreen.hideAsync();
+      await SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded, fontError]);
 
+  // Fallback timer: if fonts take longer than 1.5s, dismiss splash and render with system fonts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   if (!fontsLoaded && !fontError) {
-    return null;
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0084FF" />
+      </View>
+    );
   }
 
   return (
@@ -42,5 +53,11 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
 });

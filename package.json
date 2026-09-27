@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "expo/AppEntry.js",
   "scripts": {
-    "start": "expo start --dev-client",
+    "start": "expo start",
+    "start:go": "expo start --expo-go",
+    "start:clear": "expo start -c",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
@@ -20,7 +22,6 @@
     "expo-asset": "~11.0.0",
     "expo-build-properties": "~0.13.3",
     "expo-camera": "~16.0.0",
-    "expo-dev-client": "~5.0.0",
     "expo-file-system": "~18.0.0",
     "expo-font": "~13.0.0",
     "expo-image-manipulator": "~13.0.0",
