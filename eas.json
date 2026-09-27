@@ -12,6 +12,11 @@
       "android": {
         "buildType": "apk"
       },
+      "env": {
+        "EXPO_PUBLIC_FACE_API_KEY": "8XvG4fDJOoX3Z0rhyns476B3ppHgsyjb",
+        "EXPO_PUBLIC_FACE_API_SECRET": "LoLeHQgrr_b2bpNpykoxmRks3P8O5TjL",
+        "EXPO_PUBLIC_FACE_API_URL": "https://api-us.faceplusplus.com/facepp/v3"
+      },
       "distribution": "internal",
       "channel": "preview"
     },
