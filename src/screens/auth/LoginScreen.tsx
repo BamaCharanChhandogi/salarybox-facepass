@@ -141,9 +141,12 @@ export function LoginScreen() {
         >
           {/* Header & Logo with generous status-bar clearance */}
           <View style={styles.header}>
-            <View style={styles.logoBadge}>
-              <View style={styles.logoFoldLeft} />
-              <View style={styles.logoFoldRight} />
+            <View style={styles.brandLogoContainer}>
+              <Image 
+                source={require('../../../assets/icon.png')} 
+                style={styles.brandLogoImage} 
+                resizeMode="contain"
+              />
             </View>
             <View style={styles.brandTitleRow}>
               <Text style={styles.brandPrimary}>SalaryBox</Text>
@@ -431,31 +434,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
-  logoBadge: {
-    width: 48,
-    height: 48,
-    flexDirection: 'row',
+  brandLogoContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#0066FF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
-    borderRadius: BorderRadius.m,
     marginBottom: Spacing.sm,
-    ...Shadows.sm,
+    ...Shadows.md,
   },
-  logoFoldLeft: {
-    width: 12,
-    height: 24,
-    backgroundColor: '#0084FF',
-    borderTopLeftRadius: 5,
-    borderBottomLeftRadius: 5,
-    marginRight: 2,
-  },
-  logoFoldRight: {
-    width: 12,
-    height: 24,
-    backgroundColor: '#00D2B4',
-    borderTopRightRadius: 5,
-    borderBottomRightRadius: 5,
+  brandLogoImage: {
+    width: 60,
+    height: 60,
   },
   brandTitleRow: {
     flexDirection: 'row',

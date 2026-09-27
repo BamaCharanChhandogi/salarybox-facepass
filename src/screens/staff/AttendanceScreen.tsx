@@ -5,7 +5,8 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ScrollView,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -15,11 +16,12 @@ import {
   Clock, 
   MapPin, 
   LogOut,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
-import { getLatestAttendance, getAttendanceForUser } from '../../services/database';
+import { getLatestAttendance, getAttendanceForUser, getFaceEnrollment } from '../../services/database';
 import { resolvePhotoUri } from '../../services/fileSystem';
 import { AttendanceType, AttendanceRecord, StaffStackParamList } from '../../types';
 import { formatTime, formatDate } from '../../utils/dateFormat';
@@ -33,9 +35,12 @@ export function AttendanceScreen() {
   
   const [latestRecord, setLatestRecord] = useState<AttendanceRecord | null>(null);
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
+  const [isEnrolled, setIsEnrolled] = useState<boolean>(true);
 
   const loadAttendanceData = useCallback(async () => {
     if (user) {
+      const enrollment = await getFaceEnrollment(user.id);
+      setIsEnrolled(!!enrollment);
       const latest = await getLatestAttendance(user.id);
       const recent = await getAttendanceForUser(user.id, 5);
       setLatestRecord(latest);
@@ -51,6 +56,14 @@ export function AttendanceScreen() {
   );
 
   const handleStartAttendance = (type: AttendanceType) => {
+    if (!isEnrolled) {
+      Alert.alert(
+        'Face Profile Required',
+        'Your face has not been enrolled in the company system yet. Please ask your Workspace Admin to complete your Biometric Face Enrollment.',
+        [{ text: 'Understood', style: 'default' }]
+      );
+      return;
+    }
     navigation.navigate('BiometricPunch', { punchType: type });
   };
 
@@ -89,6 +102,21 @@ export function AttendanceScreen() {
             <Text style={styles.dateMonth}>{monthName}</Text>
           </View>
         </View>
+
+        {/* Un-enrolled Staff Warning Banner */}
+        {!isEnrolled && (
+          <View style={styles.unenrolledBanner}>
+            <View style={styles.unenrolledBannerIconCircle}>
+              <AlertTriangle size={18} color="#D97706" />
+            </View>
+            <View style={styles.unenrolledBannerContent}>
+              <Text style={styles.unenrolledBannerTitle}>Biometric Face Profile Required</Text>
+              <Text style={styles.unenrolledBannerDesc}>
+                Your 3D face scan has not been enrolled yet. Please ask your Workspace Admin to enroll your face in the Admin Dashboard before marking attendance.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Punch CTAs Grid */}
         <Text style={styles.sectionHeader}>Biometric Attendance</Text>
@@ -472,5 +500,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  unenrolledBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  unenrolledBannerIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  unenrolledBannerContent: {
+    flex: 1,
+  },
+  unenrolledBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  unenrolledBannerDesc: {
+    fontSize: 11,
+    color: '#B45309',
+    lineHeight: 16,
   },
 });

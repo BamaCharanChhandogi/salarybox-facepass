@@ -4,6 +4,7 @@ export interface LocationData {
   latitude: number;
   longitude: number;
   address?: string;
+  isMocked?: boolean;
 }
 
 /**
@@ -16,7 +17,7 @@ export async function requestLocationPermission(): Promise<boolean> {
 }
 
 /**
- * Gets current GPS coordinates with optional reverse geocoding.
+ * Gets current GPS coordinates with optional reverse geocoding and mock detection.
  */
 export async function getCurrentLocation(): Promise<LocationData> {
   const hasPermission = await requestLocationPermission();
@@ -29,6 +30,7 @@ export async function getCurrentLocation(): Promise<LocationData> {
   });
 
   const { latitude, longitude } = location.coords;
+  const isMocked = (location as any).mocked === true;
 
   // Attempt reverse geocoding for a human-readable address
   let address: string | undefined;
@@ -42,5 +44,5 @@ export async function getCurrentLocation(): Promise<LocationData> {
     // Reverse geocoding is optional, silently fail
   }
 
-  return { latitude, longitude, address };
+  return { latitude, longitude, address, isMocked };
 }

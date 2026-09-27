@@ -144,9 +144,29 @@ export async function isEmployeeIdTaken(employeeId: string): Promise<boolean> {
 
 export async function deleteStaffMember(userId: number): Promise<void> {
   const database = getDb();
+  const target = await database.getFirstAsync<any>('SELECT role, employee_id FROM users WHERE id = ?', [userId]);
+  if (!target) return;
+  if (target.role === 'admin' || target.employee_id === 'ADMIN001') {
+    throw new Error('Security Restriction: Primary Administrator account cannot be deleted.');
+  }
   await database.runAsync('DELETE FROM attendance_records WHERE user_id = ?', [userId]);
   await database.runAsync('DELETE FROM face_enrollments WHERE user_id = ?', [userId]);
   await database.runAsync('DELETE FROM users WHERE id = ?', [userId]);
+}
+
+export async function getAllOtherEnrolledStaff(excludeStaffId: number): Promise<StaffWithEnrollment[]> {
+  const rows = await getDb().getAllAsync<any>(
+    `SELECT u.*, 1 as is_enrolled, fe.enrollment_photo_uri
+     FROM users u
+     INNER JOIN face_enrollments fe ON u.id = fe.user_id
+     WHERE u.id != ? AND fe.enrollment_photo_uri IS NOT NULL`,
+    [excludeStaffId]
+  );
+  return rows.map((row) => ({
+    ...mapRowToUser(row),
+    isEnrolled: true,
+    enrollmentPhotoUri: row.enrollment_photo_uri,
+  }));
 }
 
 // ─── Face Enrollment Queries ──────────────────────────────────

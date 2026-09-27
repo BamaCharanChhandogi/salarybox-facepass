@@ -1,5 +1,14 @@
 import { detectFace, compareFaces, FACE_CONFIDENCE_THRESHOLD } from './faceApi';
 import { FaceMatchResult } from '../types';
+import { getAllOtherEnrolledStaff } from './database';
+import { resolvePhotoUri } from './fileSystem';
+
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  matchedStaffName?: string;
+  matchedEmployeeId?: string;
+  confidence?: number;
+}
 
 /**
  * Validates face presence and quality for face enrollment.
@@ -35,4 +44,34 @@ export async function verifyFaceMatch(
     rawConfidence: result.rawConfidence,
     error: result.error,
   };
+}
+
+/**
+ * Checks if a candidate face matches any existing enrolled employee face.
+ * Performs a 1:N deduplication scan across the database.
+ */
+export async function checkDuplicateFace(
+  newPhotoUri: string,
+  excludeStaffId: number
+): Promise<DuplicateCheckResult> {
+  const otherEnrolled = await getAllOtherEnrolledStaff(excludeStaffId);
+  
+  for (const existing of otherEnrolled) {
+    if (existing.enrollmentPhotoUri) {
+      const existingResolved = resolvePhotoUri(existing.enrollmentPhotoUri);
+      if (existingResolved) {
+        const result = await verifyFaceMatch(newPhotoUri, existingResolved);
+        if (result.matched) {
+          return {
+            isDuplicate: true,
+            matchedStaffName: existing.name,
+            matchedEmployeeId: existing.employeeId,
+            confidence: result.rawConfidence,
+          };
+        }
+      }
+    }
+  }
+
+  return { isDuplicate: false };
 }

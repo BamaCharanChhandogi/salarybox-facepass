@@ -23,7 +23,7 @@ import { CameraView as ExpoCameraView, useCameraPermissions } from 'expo-camera'
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { enrollFace } from '../../services/database';
 import { saveFacePhoto } from '../../services/fileSystem';
-import { validateEnrollmentPhoto } from '../../services/faceRecognition';
+import { validateEnrollmentPhoto, checkDuplicateFace } from '../../services/faceRecognition';
 import { AdminStackParamList } from '../../types';
 
 type EnrollRouteProp = RouteProp<AdminStackParamList, 'FaceEnroll'>;
@@ -73,6 +73,16 @@ export default function FaceEnrollScreen() {
 
       if (!validation.valid) {
         setErrorMessage(validation.error || 'Please center face directly inside the oval and ensure good lighting.');
+        return;
+      }
+
+      setLoadingMessage('Checking for duplicate faces across all staff...');
+      const duplicateCheck = await checkDuplicateFace(photo.uri, staffId);
+
+      if (duplicateCheck.isDuplicate) {
+        setErrorMessage(
+          `Biometric Duplicate Detected: This face is already enrolled for ${duplicateCheck.matchedStaffName} (ID: ${duplicateCheck.matchedEmployeeId}) with a ${duplicateCheck.confidence?.toFixed(0)}% match. Each employee must have a unique facial identity.`
+        );
         return;
       }
 

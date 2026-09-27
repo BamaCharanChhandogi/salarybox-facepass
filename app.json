@@ -6,8 +6,18 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "salarybox-facepass",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0066FF"
+    },
     "android": {
       "package": "com.salarybox.facepass",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0066FF"
+      },
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",

@@ -22,7 +22,7 @@ import {
 import { CameraView as ExpoCameraView, useCameraPermissions } from 'expo-camera';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
-import { getFaceEnrollment, recordAttendance } from '../../services/database';
+import { getFaceEnrollment, recordAttendance, getLatestAttendance } from '../../services/database';
 import { getCurrentLocation } from '../../services/location';
 import { verifyFaceMatch } from '../../services/faceRecognition';
 import { saveSelfie, resolvePhotoUri } from '../../services/fileSystem';
@@ -102,6 +102,42 @@ export default function BiometricPunchScreen() {
         return;
       }
 
+      // Edge Case: Sequential Punch & 60s Debounce Guard
+      const latest = await getLatestAttendance(user.id);
+      if (latest) {
+        const diffSeconds = Math.round((Date.now() - new Date(latest.timestamp).getTime()) / 1000);
+        if (diffSeconds < 60) {
+          setErrorMessage({
+            title: 'Rapid Punch Cooldown',
+            description: `A punch was already recorded ${diffSeconds}s ago. To avoid accidental duplicates, please wait at least 60 seconds between punches.`
+          });
+          return;
+        }
+
+        const isToday = new Date(latest.timestamp).toDateString() === new Date().toDateString();
+        if (punchType === 'check_in' && isToday && latest.type === 'check_in') {
+          setErrorMessage({
+            title: 'Already Checked In',
+            description: `You have already checked in today at ${formatTime(latest.timestamp)}. If you are completing your shift, please select Punch Check Out.`
+          });
+          return;
+        }
+
+        if (punchType === 'check_out' && (!isToday || latest.type !== 'check_in')) {
+          setErrorMessage({
+            title: 'No Active Check-In',
+            description: 'No check-in has been logged for today yet. Please record your Check In before punching Check Out.'
+          });
+          return;
+        }
+      } else if (punchType === 'check_out') {
+        setErrorMessage({
+          title: 'No Active Check-In',
+          description: 'No previous attendance history exists for your account. Please record your first Check In before punching Check Out.'
+        });
+        return;
+      }
+
       setLoadingMessage('Comparing selfie via Face++ AI...');
       const matchResult = await verifyFaceMatch(photo.uri, enrolledPhotoPath);
 
@@ -115,17 +151,27 @@ export default function BiometricPunchScreen() {
       }
 
       setLoadingMessage('Acquiring verified GPS coordinates...');
-      let location = { latitude: 0, longitude: 0, address: 'Unknown Location' };
+      let location = { latitude: 0, longitude: 0, address: 'Unknown Location', isMocked: false };
       try {
         const loc = await getCurrentLocation();
         location = {
           latitude: loc.latitude,
           longitude: loc.longitude,
-          address: loc.address || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`
+          address: loc.address || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`,
+          isMocked: loc.isMocked === true
         };
       } catch (locErr) {
         console.warn('[BiometricPunch] GPS error:', locErr);
         location.address = 'Location coordinates recorded';
+      }
+
+      // Edge Case: Mock GPS Detection
+      if (location.isMocked) {
+        setErrorMessage({
+          title: 'Simulated GPS Detected',
+          description: 'Mock or simulated location providers are strictly forbidden for biometric attendance verification. Please disable fake GPS apps.'
+        });
+        return;
       }
 
       setLoadingMessage('Saving verified attendance record...');
