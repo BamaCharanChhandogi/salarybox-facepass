@@ -132,6 +132,117 @@ The system provides **frictionless, fraud-proof employee attendance** through fa
 - **TypeScript Engine**: `npx tsc --noEmit` $\rightarrow$ **0 errors** (100% strict type safety).
 - **Expo Framework Check**: `npx expo-doctor` $\rightarrow$ **21/21 checks passed**.
 - **Cloud APK Distribution**:
-  - EAS Build ID: `f7a50f87-e8a1-4ef9-86a6-740c166adbb6`
+  - Latest EAS Build ID: `d506f450-96b6-430c-95e1-dd12d5d79f16`
   - Target: Android Standalone APK (`preview` profile)
-  - Direct APK Artifact: `https://expo.dev/artifacts/eas/KkZRLlG4m6Y9TP0aKU03cmfFMiMy3M6gUcJIACjc3sY.apk`
+  - Install Link: `https://expo.dev/accounts/bama676s-team/projects/salarybox-facepass/builds/d506f450-96b6-430c-95e1-dd12d5d79f16`
+
+---
+
+## 5. Session 2 — Architecture Decisions (Dark Mode, Keyboard, Permissions)
+
+### Decision 9: Automatic Device Dark / Light Mode Detection
+
+* **The Problem**: The entire app was hardcoded to a single light color palette (~100+ hex values scattered across 15+ files). Users on Android 10+ with system-wide dark theme enabled would see a jarring bright white app that doesn't respect their preference.
+* **The Architectural Decision**:
+  - Created a centralized **ThemeContext** (`src/context/ThemeContext.tsx`) using React Native's `useColorScheme()` hook to detect the device's active color scheme in real-time.
+  - Defined **100+ semantic color tokens** for both light and dark palettes (backgrounds, surfaces, borders, text tiers, badges, pills, banners, icons, cards, modals, inputs, status indicators).
+  - Created a separate **dark shadow system** with higher opacity and `#000000` shadow color (vs `#0F172A` in light mode) for proper elevation contrast on dark surfaces.
+  - Wrapped the entire app in `<ThemeProvider>` at the root level in `Providers.tsx`.
+  - Wired React Navigation's `theme` prop to dynamically match the custom theme (header bg, tab bar bg, card bg, text color, border color all switch).
+* **Files Modified (15 total)**:
+  - New: `src/context/ThemeContext.tsx`
+  - Shell: `src/Providers.tsx`
+  - Navigators: `AdminNavigator.tsx`, `StaffNavigator.tsx`
+  - All Screens: `LoginScreen`, `DashboardScreen`, `AddStaffScreen`, `StaffListScreen`, `StaffProfileScreen`, `AttendanceScreen`, `HistoryScreen`
+  - UI Components: `Button.tsx`, `Input.tsx`
+* **Intentionally Untouched**: Camera overlay screens (`FaceEnrollScreen`, `BiometricPunchScreen`, `CameraView`, `FaceOverlay`) — these use black camera backgrounds with white text overlays that work correctly in both themes by design.
+* **Implementation Pattern**: Static structural styles stay in `StyleSheet.create()`, dynamic color overrides applied inline via `[styles.xxx, { backgroundColor: colors.xxx }]` or via `useMemo`-based dynamic stylesheets for complex screens.
+
+---
+
+### Decision 10: Attendance Punctuality Badges & Refined State Machine
+
+* **The Problem**: The basic check-in/check-out state machine enforced sequencing but gave no visual feedback about whether an employee was on time, late, or half-day.
+* **The Architectural Decision**:
+  - Added a `getPunctualityStatus()` function inside `AttendanceScreen` that evaluates each check-in timestamp against configurable business rules:
+
+  | Condition | Badge | Theme Token |
+  | :--- | :--- | :--- |
+  | Check-in $\le$ 09:45 AM | ✅ On Time | `colors.onTimeColor` / `colors.onTimeBg` |
+  | Check-in 09:45 AM – 01:00 PM | ⚠️ Late Mark | `colors.lateColor` / `colors.lateBg` |
+  | Check-in after 01:00 PM | 🔶 Half Day | `colors.halfDayColor` / `colors.halfDayBg` |
+  | Any Check-out | 🔵 Shift Ended | `colors.shiftEndedColor` / `colors.shiftEndedBg` |
+
+  - Each punch card now shows a disabled state pill when unavailable: "Locked" (grey, with lock icon), "Already Punched" (blue, informational), or "Ready" (teal, actionable).
+  - Active shift banner shows a pulsing green dot + elapsed time badge when the user is currently checked in.
+
+---
+
+### Decision 11: Upfront Permission Requests at App Launch
+
+* **The Problem**: Permissions for Camera and Location were being requested piecemeal — the first time a user opened the camera or tried to punch attendance. This caused a jarring UX where the app appeared to "hang" while waiting for OS permission dialogs.
+* **The Architectural Decision**:
+  - Added a `useEffect` in `App.tsx` that runs `Promise.all([Camera.requestCameraPermissionsAsync(), Location.requestForegroundPermissionsAsync()])` on mount.
+  - Each call has its own `.catch()` handler so one failure doesn't block the other.
+  - Result: Permission dialogs appear once on first launch (like production apps), and all subsequent camera/GPS operations open instantly without delay.
+  - Fallback guards in `CameraView.tsx` (via `useCameraPermissions()`) and `location.ts` (via `requestForegroundPermissionsAsync()`) still exist as safety nets.
+
+---
+
+### Decision 12: Inline Expandable Manual Sign-In Card (Eliminating Modal & Keyboard Conflicts)
+
+* **The Problem**: Wrapping manual credentials input in a detached `<Modal>` Dialog on Android caused a continuous conflict with the virtual keyboard:
+  - Without manual bottom padding, the modal remained pinned to the screen bottom and was covered by the keyboard.
+  - Adding manual `keyboardHeight` padding created a massive empty dark gap (~250–300px) between the form button and the keyboard, pushing the top inputs off-screen.
+* **The Root Cause**: Android's `windowSoftInputMode="adjustResize"` does not reliably propagate to detached `<Modal>` Dialog windows.
+* **The Architectural Decision**:
+  - Replaced the detached `<Modal>` with an **inline expandable accordion card** (`manualCard`) directly inside the main `ScrollView` of `LoginScreen.tsx`.
+  - Tapping *"Sign In with Custom ID & Password"* smoothly expands the form inline beneath the staff list, and auto-scrolls the view so the inputs are comfortably in focus.
+  - Tapping either input field relies on Android and React Native's native `ScrollView` keyboard handling: the page naturally scrolls so the focused input sits directly above the keyboard.
+  - **Result**: Zero modal glitches, zero artificial padding hacks, zero empty gaps, zero off-screen clippings, and full support for dark mode.
+
+---
+
+### Decision 13: Case-Insensitive Manual Authentication
+
+* **The Problem**: If an admin created an employee with ID `ADMIN001`, the manual sign-in form required typing the exact case. Typing `admin001` or `Admin001` would fail.
+* **The Architectural Decision**:
+  - Modified the `authenticateUser` SQL query in `database.ts` to use `UPPER(TRIM())` matching:
+    ```sql
+    SELECT * FROM staff WHERE 
+      UPPER(TRIM(employee_id)) = UPPER(?) 
+      OR UPPER(TRIM(name)) = UPPER(?)
+    ```
+  - Both employee ID and name fields are now case-insensitive. Users can type in any case and still authenticate successfully.
+  - Password validation runs after the user lookup (passwords remain case-sensitive for security).
+
+---
+
+### Decision 14: Dynamic Bottom Tab Bar Safe Area Insets
+
+* **The Problem**: In `StaffNavigator.tsx`, `tabBarStyle` used a rigid hardcoded height (`height: 62, paddingBottom: 8`). On Android devices using modern gesture navigation (where the system navigation pill occupies ~20–34px at the bottom), the labels (`Attendance` and `History`) were pressed directly against the bottom edge and overlapped by the gesture bar.
+* **The Architectural Decision**:
+  - Imported `useSafeAreaInsets` from `react-native-safe-area-context` in `StaffNavigator.tsx`.
+  - Applied dynamic tab bar height and bottom padding:
+    ```tsx
+    const insets = useSafeAreaInsets();
+    const bottomInset = Math.max(insets.bottom, 12);
+    // tabBarStyle: { height: 60 + bottomInset, paddingBottom: bottomInset, paddingTop: 8 }
+    ```
+  - **Result**: Tab icons and text labels now have generous breathing room and sit clearly above the system navigation/gesture bar across all device form factors.
+
+---
+
+## 6. Updated Edge Cases (Session 2 Additions)
+
+| Category | Edge Case | Mitigation / Implemented Guard |
+| :--- | :--- | :--- |
+| **Theming** | Device dark mode active | `useColorScheme()` detects system theme; entire app palette switches in real-time via ThemeContext. |
+| **Theming** | Camera screens in dark mode | Intentionally untouched — camera overlays use black bg + white text that works in both modes. |
+| **Punctuality** | Late employee check-in | Visual badge (Late Mark / Half Day) auto-computed from check-in timestamp. |
+| **Permissions** | User denies Camera/Location on launch | Fallback guards in CameraView and location service re-request when feature is accessed. |
+| **Keyboard** | Android modal keyboard conflicts | Replaced modal with inline expandable card in ScrollView; zero padding hacks needed. |
+| **Tab Bar** | Gesture navigation bar overlap | Dynamic `insets.bottom` padding applied to `StaffNavigator` tab bar. |
+| **Auth** | Case mismatch on manual login | `UPPER(TRIM())` SQL matching on both employee_id and name fields. |
+
+

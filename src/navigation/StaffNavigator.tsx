@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, StyleSheet, View, Text, Alert } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StaffStackParamList, StaffTabParamList } from '../types';
 import { Camera, Clock, LogOut } from 'lucide-react-native';
 import { Colors } from '../constants/theme';
@@ -19,6 +20,8 @@ const Stack = createNativeStackNavigator<StaffStackParamList>();
 function StaffTabs() {
   const { logout } = useAuth();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 12);
 
   const handleLogout = () => {
     Alert.alert(
@@ -44,8 +47,8 @@ function StaffTabs() {
           backgroundColor: colors.tabBarBg,
           borderTopWidth: 1,
           borderTopColor: colors.tabBarBorder,
-          height: 62,
-          paddingBottom: 8,
+          height: 60 + bottomInset,
+          paddingBottom: bottomInset,
           paddingTop: 8,
         },
         tabBarLabelStyle: {

@@ -1,18 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
   TextInput, 
   TouchableOpacity, 
   StyleSheet, 
-  KeyboardAvoidingView, 
   Platform, 
   ActivityIndicator, 
-  Alert,
-  ScrollView,
-  Image,
-  Modal,
-  Keyboard
+  Alert, 
+  ScrollView, 
+  Image, 
+  Keyboard 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -56,25 +54,8 @@ export function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<'id' | 'password' | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  // Track keyboard appearance to push manual sign-in modal cleanly above virtual keyboard
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+  const passwordInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Dynamically fetch all staff members from SQLite database with visual feedback cue
   const loadStaff = useCallback(async () => {
@@ -157,9 +138,17 @@ export function LoginScreen() {
   const topSafeAreaPadding = Math.max(insets.top, 24) + Spacing.sm;
 
   return (
-    <View style={[styles.container, { paddingTop: topSafeAreaPadding }]}>
+    <View style={styles.container}>
       <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) + 40, flexGrow: 1 }]}
+        ref={scrollViewRef}
+        contentContainerStyle={[
+          styles.scrollContent, 
+          { 
+            paddingTop: topSafeAreaPadding,
+            paddingBottom: showManualForm && focusedField ? 340 : Math.max(insets.bottom, 20) + 40, 
+            flexGrow: 1 
+          }
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -348,152 +337,129 @@ export function LoginScreen() {
           )}
 
           {/* ════════════════════════════════════════════════════════════ */}
-          {/* SECTION 3: MANUAL SIGN IN BUTTON                           */}
+          {/* SECTION 3: MANUAL SIGN IN ACCORDION                         */}
           {/* ════════════════════════════════════════════════════════════ */}
           <View style={styles.manualSection}>
             <TouchableOpacity 
               style={styles.manualAccordionBtn}
-              onPress={() => setShowManualForm(true)}
+              onPress={() => {
+                const nextState = !showManualForm;
+                setShowManualForm(nextState);
+                if (nextState) {
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 120);
+                }
+              }}
               activeOpacity={0.8}
             >
-              <Lock size={15} color="#0066FF" style={{ marginRight: 6 }} />
+              <Lock size={15} color={Colors.primary} style={{ marginRight: 6 }} />
               <Text style={styles.manualAccordionText}>
-                Sign In with Custom ID & Password
+                {showManualForm ? 'Hide Manual Sign In' : 'Sign In with Custom ID & Password'}
               </Text>
-              <ArrowRight size={14} color="#0066FF" />
+              {showManualForm ? (
+                <ChevronUp size={16} color={colors.textSecondary} />
+              ) : (
+                <ChevronDown size={16} color={colors.textSecondary} />
+              )}
             </TouchableOpacity>
-          </View>
 
-        </ScrollView>
+            {/* Inline Expandable Form Card */}
+            {showManualForm && (
+              <View style={styles.manualCard}>
+                <View style={styles.manualCardHeader}>
+                  <Text style={styles.manualCardTitle}>Manual Sign In</Text>
+                  <Text style={styles.manualCardSubtitle}>Enter your Employee ID or Name & Password</Text>
+                </View>
 
-        {/* ════════════════════════════════════════════════════════════ */}
-        {/* MODAL: DEDICATED BOTTOM SHEET FOR MANUAL LOGIN              */}
-        {/* ════════════════════════════════════════════════════════════ */}
-        <Modal
-          visible={showManualForm}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => {
-            Keyboard.dismiss();
-            setShowManualForm(false);
-          }}
-        >
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.keyboardAvoidingView}
-          >
-            <View style={styles.modalBackdrop}>
-              <TouchableOpacity 
-                style={styles.modalDismissArea} 
-                activeOpacity={1} 
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setShowManualForm(false);
-                }} 
-              />
-              <View style={[
-                styles.modalSheet, 
-                { 
-                  paddingBottom: keyboardHeight > 0 ? 16 : Math.max(insets.bottom, 20) + 16,
-                }
-              ]}>
-                <View style={styles.modalHeader}>
-                  <View style={styles.modalDragHandle} />
-                  <View style={styles.modalHeaderRow}>
-                    <View>
-                      <Text style={styles.modalTitle}>Manual Sign In</Text>
-                      <Text style={styles.modalSubtitle}>Enter your Employee ID & Password</Text>
-                    </View>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        Keyboard.dismiss();
-                        setShowManualForm(false);
+                {/* Employee ID */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Employee ID or Name</Text>
+                  <View style={[
+                    styles.inputWrapper,
+                    focusedField === 'id' && styles.inputWrapperFocused
+                  ]}>
+                    <User size={18} color={focusedField === 'id' ? Colors.primary : colors.textTertiary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. ADMIN001 or EMP001"
+                      placeholderTextColor={colors.textTertiary}
+                      value={employeeId}
+                      onChangeText={setEmployeeId}
+                      onFocus={() => {
+                        setFocusedField('id');
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollToEnd({ animated: true });
+                        }, 150);
                       }}
-                      style={styles.modalCloseBtn}
+                      onBlur={() => setFocusedField(null)}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordInputRef.current?.focus()}
+                      blurOnSubmit={false}
+                    />
+                  </View>
+                </View>
+
+                {/* Password */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Password</Text>
+                  <View style={[
+                    styles.inputWrapper,
+                    focusedField === 'password' && styles.inputWrapperFocused
+                  ]}>
+                    <Lock size={18} color={focusedField === 'password' ? Colors.primary : colors.textTertiary} style={styles.inputIcon} />
+                    <TextInput
+                      ref={passwordInputRef}
+                      style={styles.textInput}
+                      placeholder="Enter account password"
+                      placeholderTextColor={colors.textTertiary}
+                      value={password}
+                      onChangeText={setPassword}
+                      onFocus={() => {
+                        setFocusedField('password');
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollToEnd({ animated: true });
+                        }, 150);
+                      }}
+                      onBlur={() => setFocusedField(null)}
+                      secureTextEntry={!showPassword}
+                      returnKeyType="done"
+                      onSubmitEditing={handleManualLogin}
+                    />
+                    <TouchableOpacity 
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeBtn}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      <X size={20} color={colors.textSecondary} />
+                      {showPassword ? (
+                        <EyeOff size={18} color={colors.textSecondary} />
+                      ) : (
+                        <Eye size={18} color={colors.textSecondary} />
+                      )}
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Form Inputs Container - Non-scrollable, sticks with full height directly above keyboard */}
-                <View style={styles.modalFormContent}>
-                  {/* Employee ID */}
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Employee ID or Name</Text>
-                    <View style={[
-                      styles.inputWrapper,
-                      focusedField === 'id' && styles.inputWrapperFocused
-                    ]}>
-                      <User size={18} color={focusedField === 'id' ? Colors.primary : colors.textTertiary} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="e.g. ADMIN001 or EMP001"
-                        placeholderTextColor={colors.textTertiary}
-                        value={employeeId}
-                        onChangeText={setEmployeeId}
-                        onFocus={() => setFocusedField('id')}
-                        onBlur={() => setFocusedField(null)}
-                        autoCapitalize="characters"
-                        autoCorrect={false}
-                        returnKeyType="next"
-                      />
-                    </View>
-                  </View>
-
-                  {/* Password */}
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Password</Text>
-                    <View style={[
-                      styles.inputWrapper,
-                      focusedField === 'password' && styles.inputWrapperFocused
-                    ]}>
-                      <Lock size={18} color={focusedField === 'password' ? Colors.primary : colors.textTertiary} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Enter account password"
-                        placeholderTextColor={colors.textTertiary}
-                        value={password}
-                        onChangeText={setPassword}
-                        onFocus={() => setFocusedField('password')}
-                        onBlur={() => setFocusedField(null)}
-                        secureTextEntry={!showPassword}
-                        returnKeyType="done"
-                        onSubmitEditing={handleManualLogin}
-                      />
-                      <TouchableOpacity 
-                        onPress={() => setShowPassword(!showPassword)}
-                        style={styles.eyeBtn}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        {showPassword ? (
-                          <EyeOff size={18} color={colors.textSecondary} />
-                        ) : (
-                          <Eye size={18} color={colors.textSecondary} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Sign In Button */}
-                  <TouchableOpacity 
-                    style={[styles.primaryButton, manualLoading && styles.buttonDisabled]} 
-                    onPress={handleManualLogin}
-                    disabled={manualLoading}
-                    activeOpacity={0.88}
-                  >
-                    {manualLoading ? (
-                      <ActivityIndicator color="white" size="small" />
-                    ) : (
-                      <Text style={styles.primaryButtonText}>Sign In with Credentials</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                {/* Sign In Button */}
+                <TouchableOpacity 
+                  style={[styles.primaryButton, manualLoading && styles.buttonDisabled]} 
+                  onPress={handleManualLogin}
+                  disabled={manualLoading}
+                  activeOpacity={0.88}
+                >
+                  {manualLoading ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Sign In with Credentials</Text>
+                  )}
+                </TouchableOpacity>
               </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
+            )}
+          </View>
+
+        </ScrollView>
       </View>
     );
   }
@@ -935,61 +901,18 @@ const createStyles = (colors: any, shadows: any, isDark: boolean) => StyleSheet.
     fontWeight: '700',
     letterSpacing: -0.2,
   },
-  keyboardAvoidingView: {
-    flex: 1,
+  manualCardHeader: {
+    marginBottom: Spacing.md,
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: colors.modalOverlay,
-    justifyContent: 'flex-end',
-  },
-  modalDismissArea: {
-    ...StyleSheet.absoluteFill,
-  },
-  modalSheet: {
-    backgroundColor: colors.modalBackground,
-    borderTopLeftRadius: BorderRadius.xl * 1.5,
-    borderTopRightRadius: BorderRadius.xl * 1.5,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.sm,
-    ...shadows.lg,
-  },
-  modalFormContent: {
-    paddingTop: Spacing.xs,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modalDragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.modalDragHandle,
-    marginBottom: Spacing.sm,
-  },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  modalTitle: {
-    fontSize: 18,
+  manualCardTitle: {
+    fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
+    letterSpacing: -0.3,
   },
-  modalSubtitle: {
+  manualCardSubtitle: {
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
-  },
-  modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
