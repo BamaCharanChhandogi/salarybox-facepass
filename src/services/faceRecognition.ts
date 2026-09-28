@@ -56,10 +56,16 @@ export async function checkDuplicateFace(
 ): Promise<DuplicateCheckResult> {
   const otherEnrolled = await getAllOtherEnrolledStaff(excludeStaffId);
   
-  for (const existing of otherEnrolled) {
+  for (let i = 0; i < otherEnrolled.length; i++) {
+    const existing = otherEnrolled[i];
     if (existing.enrollmentPhotoUri) {
       const existingResolved = resolvePhotoUri(existing.enrollmentPhotoUri);
       if (existingResolved) {
+        // Safe 300ms throttle between sequential Face++ calls to protect QPS limits
+        if (i > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+
         const result = await verifyFaceMatch(newPhotoUri, existingResolved);
         if (result.matched) {
           return {

@@ -10,7 +10,8 @@ import {
   ActivityIndicator, 
   Alert,
   ScrollView,
-  Image
+  Image,
+  Modal
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -27,7 +28,8 @@ import {
   ChevronUp,
   Sparkles,
   Users,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
@@ -130,15 +132,11 @@ export function LoginScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topSafeAreaPadding }]}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) + 40, flexGrow: 1 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView 
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) + 30 }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           {/* Header & Logo with generous status-bar clearance */}
           <View style={styles.header}>
             <View style={styles.brandLogoContainer}>
@@ -321,26 +319,65 @@ export function LoginScreen() {
           )}
 
           {/* ════════════════════════════════════════════════════════════ */}
-          {/* SECTION 3: MANUAL LOGIN ACCORDION                          */}
+          {/* SECTION 3: MANUAL SIGN IN BUTTON                           */}
           {/* ════════════════════════════════════════════════════════════ */}
           <View style={styles.manualSection}>
             <TouchableOpacity 
               style={styles.manualAccordionBtn}
-              onPress={() => setShowManualForm(!showManualForm)}
+              onPress={() => setShowManualForm(true)}
               activeOpacity={0.8}
             >
+              <Lock size={15} color="#0066FF" style={{ marginRight: 6 }} />
               <Text style={styles.manualAccordionText}>
-                {showManualForm ? 'Hide Manual Login Form' : 'Or Sign In with Custom Credentials'}
+                Sign In with Custom ID & Password
               </Text>
-              {showManualForm ? (
-                <ChevronUp size={16} color="#64748B" />
-              ) : (
-                <ChevronDown size={16} color="#64748B" />
-              )}
+              <ArrowRight size={14} color="#0066FF" />
             </TouchableOpacity>
+          </View>
 
-            {showManualForm && (
-              <View style={styles.manualCard}>
+        </ScrollView>
+
+        {/* ════════════════════════════════════════════════════════════ */}
+        {/* MODAL: DEDICATED BOTTOM SHEET FOR MANUAL LOGIN              */}
+        {/* ════════════════════════════════════════════════════════════ */}
+        <Modal
+          visible={showManualForm}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowManualForm(false)}
+        >
+          <KeyboardAvoidingView 
+            style={styles.modalBackdrop}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <TouchableOpacity 
+              style={styles.modalDismissArea} 
+              activeOpacity={1} 
+              onPress={() => setShowManualForm(false)} 
+            />
+            <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalDragHandle} />
+                <View style={styles.modalHeaderRow}>
+                  <View>
+                    <Text style={styles.modalTitle}>Manual Sign In</Text>
+                    <Text style={styles.modalSubtitle}>Enter your Employee ID & Password</Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={() => setShowManualForm(false)}
+                    style={styles.modalCloseBtn}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <X size={20} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <ScrollView 
+                keyboardShouldPersistTaps="handled" 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingTop: Spacing.sm }}
+              >
                 {/* Employee ID */}
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>Employee ID</Text>
@@ -359,6 +396,7 @@ export function LoginScreen() {
                       onBlur={() => setFocusedField(null)}
                       autoCapitalize="characters"
                       autoCorrect={false}
+                      returnKeyType="next"
                     />
                   </View>
                 </View>
@@ -380,6 +418,8 @@ export function LoginScreen() {
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
                       secureTextEntry={!showPassword}
+                      returnKeyType="done"
+                      onSubmitEditing={handleManualLogin}
                     />
                     <TouchableOpacity 
                       onPress={() => setShowPassword(!showPassword)}
@@ -408,15 +448,13 @@ export function LoginScreen() {
                     <Text style={styles.primaryButtonText}>Sign In with Credentials</Text>
                   )}
                 </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
-  );
-}
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      </View>
+    );
+  }
 
 const styles = StyleSheet.create({
   container: {
@@ -840,5 +878,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalDismissArea: {
+    flex: 1,
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: BorderRadius.xl * 1.5,
+    borderTopRightRadius: BorderRadius.xl * 1.5,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
+    maxHeight: '85%',
+    ...Shadows.lg,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalDragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: Spacing.sm,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

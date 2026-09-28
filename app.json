@@ -16,7 +16,7 @@
       "package": "com.salarybox.facepass",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0066FF"
+        "backgroundColor": "#0A192F"
       },
       "permissions": [
         "CAMERA",

@@ -17,7 +17,9 @@ import {
   MapPin, 
   LogOut,
   ChevronRight,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2,
+  Lock
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
@@ -27,6 +29,22 @@ import { AttendanceType, AttendanceRecord, StaffStackParamList } from '../../typ
 import { formatTime, formatDate } from '../../utils/dateFormat';
 
 type NavigationProp = NativeStackNavigationProp<StaffStackParamList>;
+
+function getPunctualityStatus(timestamp: string, type: AttendanceType) {
+  if (type === 'check_out') {
+    return { label: 'Shift Ended', color: '#0369A1', bg: '#E0F2FE' };
+  }
+  const d = new Date(timestamp);
+  const totalMinutes = d.getHours() * 60 + d.getMinutes();
+  // 09:45 AM = 585 minutes; 01:00 PM = 780 minutes
+  if (totalMinutes <= 585) {
+    return { label: 'On Time', color: '#059669', bg: '#ECFDF5' };
+  } else if (totalMinutes <= 780) {
+    return { label: 'Late Mark', color: '#D97706', bg: '#FEF3C7' };
+  } else {
+    return { label: 'Half Day', color: '#EA580C', bg: '#FFEDD5' };
+  }
+}
 
 export function AttendanceScreen() {
   const insets = useSafeAreaInsets();
@@ -55,6 +73,19 @@ export function AttendanceScreen() {
     }, [loadAttendanceData])
   );
 
+  const isCheckedInToday = !!latestRecord && 
+    new Date(latestRecord.timestamp).toDateString() === new Date().toDateString() &&
+    latestRecord.type === 'check_in';
+
+  // Calculate live shift elapsed time
+  let shiftDurationStr = '';
+  if (isCheckedInToday && latestRecord) {
+    const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(latestRecord.timestamp).getTime()) / 60000));
+    const hours = Math.floor(elapsedMinutes / 60);
+    const mins = elapsedMinutes % 60;
+    shiftDurationStr = `${hours}h ${mins}m`;
+  }
+
   const handleStartAttendance = (type: AttendanceType) => {
     if (!isEnrolled) {
       Alert.alert(
@@ -64,12 +95,27 @@ export function AttendanceScreen() {
       );
       return;
     }
+
+    if (type === 'check_in' && isCheckedInToday) {
+      Alert.alert(
+        'Shift Already Active',
+        `You have already checked in today at ${formatTime(latestRecord!.timestamp)}. If your work shift is completed, please select Punch Check Out.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
+    if (type === 'check_out' && !isCheckedInToday) {
+      Alert.alert(
+        'Check-In Required',
+        'You have not checked in yet today. You must record your Check In before punching Check Out.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
     navigation.navigate('BiometricPunch', { punchType: type });
   };
-
-  const isCheckedInToday = latestRecord && 
-    new Date(latestRecord.timestamp).toDateString() === new Date().toDateString() &&
-    latestRecord.type === 'check_in';
 
   const today = new Date();
   const dayNumber = today.getDate();
@@ -103,6 +149,27 @@ export function AttendanceScreen() {
           </View>
         </View>
 
+        {/* Live Active Shift Banner */}
+        {isCheckedInToday && latestRecord && (
+          <View style={styles.activeShiftBanner}>
+            <View style={styles.activeShiftDotPulse}>
+              <View style={styles.activeShiftDotInner} />
+            </View>
+            <View style={styles.activeShiftContent}>
+              <View style={styles.activeShiftTitleRow}>
+                <Text style={styles.activeShiftTitle}>Shift In Progress</Text>
+                <View style={styles.activeShiftTimerBadge}>
+                  <Clock size={11} color="#059669" style={{ marginRight: 3 }} />
+                  <Text style={styles.activeShiftTimerText}>{shiftDurationStr}</Text>
+                </View>
+              </View>
+              <Text style={styles.activeShiftDesc}>
+                Checked in at {formatTime(latestRecord.timestamp)} • Ready for check out
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Un-enrolled Staff Warning Banner */}
         {!isEnrolled && (
           <View style={styles.unenrolledBanner}>
@@ -118,32 +185,80 @@ export function AttendanceScreen() {
           </View>
         )}
 
-        {/* Punch CTAs Grid */}
+        {/* Punch CTAs Grid with Strict State Machine Logic */}
         <Text style={styles.sectionHeader}>Biometric Attendance</Text>
         <View style={styles.actionGrid}>
           
-          {/* Check In Card */}
+          {/* Check In Card: ACTIVE when not checked in, DISABLED when checked in */}
           <TouchableOpacity 
-            style={[styles.punchCard, styles.checkInCard]}
+            style={[
+              styles.punchCard, 
+              styles.checkInCard,
+              isCheckedInToday && styles.punchCardDisabled
+            ]}
             onPress={() => handleStartAttendance('check_in')}
-            activeOpacity={0.85}
+            activeOpacity={isCheckedInToday ? 0.9 : 0.85}
           >
-            <View style={styles.punchIconCircleCheckIn}>
-              <ScanFace size={26} color="#0D9488" />
+            <View style={[
+              styles.punchIconCircleCheckIn,
+              isCheckedInToday && styles.punchIconCircleDisabled
+            ]}>
+              {isCheckedInToday ? (
+                <CheckCircle2 size={24} color="#64748B" />
+              ) : (
+                <ScanFace size={26} color="#0D9488" />
+              )}
             </View>
-            <Text style={styles.punchTitle}>Punch Check In</Text>
+            <Text style={[styles.punchTitle, isCheckedInToday && styles.punchTitleDisabled]}>
+              {isCheckedInToday ? 'Checked In' : 'Punch Check In'}
+            </Text>
+            <View style={[
+              styles.statePill,
+              isCheckedInToday ? styles.statePillActive : styles.statePillReady
+            ]}>
+              <Text style={[
+                styles.statePillText,
+                isCheckedInToday ? styles.statePillActiveText : styles.statePillReadyText
+              ]}>
+                {isCheckedInToday ? 'Already on shift' : 'Start Shift'}
+              </Text>
+            </View>
           </TouchableOpacity>
 
-          {/* Check Out Card */}
+          {/* Check Out Card: ACTIVE when checked in, DISABLED when not checked in */}
           <TouchableOpacity 
-            style={[styles.punchCard, styles.checkOutCard]}
+            style={[
+              styles.punchCard, 
+              styles.checkOutCard,
+              !isCheckedInToday && styles.punchCardDisabled
+            ]}
             onPress={() => handleStartAttendance('check_out')}
-            activeOpacity={0.85}
+            activeOpacity={!isCheckedInToday ? 0.9 : 0.85}
           >
-            <View style={styles.punchIconCircleCheckOut}>
-              <LogOut size={24} color="#0284C7" />
+            <View style={[
+              styles.punchIconCircleCheckOut,
+              !isCheckedInToday && styles.punchIconCircleDisabled
+            ]}>
+              {!isCheckedInToday ? (
+                <Lock size={22} color="#64748B" />
+              ) : (
+                <LogOut size={24} color="#0284C7" />
+              )}
             </View>
-            <Text style={styles.punchTitle}>Punch Check Out</Text>
+            <Text style={[styles.punchTitle, !isCheckedInToday && styles.punchTitleDisabled]}>
+              Punch Check Out
+            </Text>
+            <View style={[
+              styles.statePill,
+              !isCheckedInToday ? styles.statePillLocked : styles.statePillActive
+            ]}>
+              <Text style={[
+                styles.statePillText,
+                !isCheckedInToday ? styles.statePillLockedText : styles.statePillActiveText
+              ]}>
+                {!isCheckedInToday ? 'Check in first' : 'End Shift'}
+              </Text>
+            </View>
           </TouchableOpacity>
 
         </View>
@@ -164,6 +279,8 @@ export function AttendanceScreen() {
           recentRecords.map((record) => {
             const resolvedSelfie = resolvePhotoUri(record.selfieUri);
             const isCheckIn = record.type === 'check_in';
+            const punctuality = getPunctualityStatus(record.timestamp, record.type);
+
             return (
               <View key={record.id} style={styles.historyCard}>
                 <View style={styles.historyThumbBox}>
@@ -187,6 +304,11 @@ export function AttendanceScreen() {
                         isCheckIn ? styles.typeCheckInText : styles.typeCheckOutText
                       ]}>
                         {isCheckIn ? 'CHECK IN' : 'CHECK OUT'}
+                      </Text>
+                    </View>
+                    <View style={[styles.punctualityPill, { backgroundColor: punctuality.bg }]}>
+                      <Text style={[styles.punctualityText, { color: punctuality.color }]}>
+                        {punctuality.label}
                       </Text>
                     </View>
                     <Text style={styles.historyTime}>{formatTime(record.timestamp)}</Text>
@@ -534,5 +656,117 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#B45309',
     lineHeight: 16,
+  },
+  activeShiftBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  activeShiftDotPulse: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeShiftDotInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#16A34A',
+  },
+  activeShiftContent: {
+    flex: 1,
+  },
+  activeShiftTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  activeShiftTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  activeShiftTimerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  activeShiftTimerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  activeShiftDesc: {
+    fontSize: 11,
+    color: '#166534',
+  },
+  punchCardDisabled: {
+    opacity: 0.48,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  punchIconCircleDisabled: {
+    backgroundColor: '#E2E8F0',
+  },
+  punchTitleDisabled: {
+    color: '#64748B',
+  },
+  statePill: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    alignSelf: 'flex-start',
+  },
+  statePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  statePillReady: {
+    backgroundColor: '#CCFBF1',
+  },
+  statePillReadyText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0F766E',
+  },
+  statePillActive: {
+    backgroundColor: '#E0F2FE',
+  },
+  statePillActiveText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0369A1',
+  },
+  statePillLocked: {
+    backgroundColor: '#F1F5F9',
+  },
+  statePillLockedText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  punctualityPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  punctualityText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
