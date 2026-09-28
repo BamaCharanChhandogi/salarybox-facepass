@@ -7,3 +7,4 @@ ios/
 *.apk
 *.aab
 .env
+ARCHITECTURE_AND_DECISIONS.md
