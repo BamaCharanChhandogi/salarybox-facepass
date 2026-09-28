@@ -14,12 +14,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { UserPlus, User, IdCard, Lock, Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react-native';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { addStaffMember, isEmployeeIdTaken } from '../../services/database';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function AddStaffScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { colors, shadows } = useTheme();
   const [employeeId, setEmployeeId] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -74,7 +76,7 @@ export default function AddStaffScreen() {
   };
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -85,31 +87,32 @@ export default function AddStaffScreen() {
         >
           
           {/* Hero Banner */}
-          <View style={styles.headerCard}>
-            <View style={styles.iconCircle}>
+          <View style={[styles.headerCard, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle, ...shadows.sm }]}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.iconCircleBg }]}>
               <UserPlus size={24} color={Colors.primary} />
             </View>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>New Staff Member</Text>
-              <Text style={styles.headerSubtitle}>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
                 Create credentials for attendance tracking & biometric verification.
               </Text>
             </View>
           </View>
 
           {/* Form Card */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle, ...shadows.sm }]}>
             
             {/* Employee ID */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Employee ID</Text>
+              <Text style={[styles.label, { color: colors.labelColor }]}>Employee ID</Text>
               <View style={[
                 styles.inputWrapper,
+                { backgroundColor: colors.surface, borderColor: colors.border },
                 focusedField === 'employeeId' && styles.inputWrapperFocused,
                 errors.employeeId && styles.inputWrapperError
               ]}>
                 <View style={styles.inputIconContainer}>
-                  <IdCard size={18} color={focusedField === 'employeeId' ? Colors.primary : '#94A3B8'} />
+                  <IdCard size={18} color={focusedField === 'employeeId' ? Colors.primary : colors.iconSubtle} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -121,7 +124,7 @@ export default function AddStaffScreen() {
                   onFocus={() => setFocusedField('employeeId')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="e.g. EMP002"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.iconSubtle}
                   autoCapitalize="characters"
                   autoCorrect={false}
                 />
@@ -131,14 +134,15 @@ export default function AddStaffScreen() {
 
             {/* Full Name */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Full Name</Text>
+              <Text style={[styles.label, { color: colors.labelColor }]}>Full Name</Text>
               <View style={[
                 styles.inputWrapper,
+                { backgroundColor: colors.surface, borderColor: colors.border },
                 focusedField === 'name' && styles.inputWrapperFocused,
                 errors.name && styles.inputWrapperError
               ]}>
                 <View style={styles.inputIconContainer}>
-                  <User size={18} color={focusedField === 'name' ? Colors.primary : '#94A3B8'} />
+                  <User size={18} color={focusedField === 'name' ? Colors.primary : colors.iconSubtle} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -150,7 +154,7 @@ export default function AddStaffScreen() {
                   onFocus={() => setFocusedField('name')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="e.g. Alex Morgan"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.iconSubtle}
                   autoCapitalize="words"
                 />
               </View>
@@ -159,14 +163,15 @@ export default function AddStaffScreen() {
 
             {/* Password */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={[styles.label, { color: colors.labelColor }]}>Password</Text>
               <View style={[
                 styles.inputWrapper,
+                { backgroundColor: colors.surface, borderColor: colors.border },
                 focusedField === 'password' && styles.inputWrapperFocused,
                 errors.password && styles.inputWrapperError
               ]}>
                 <View style={styles.inputIconContainer}>
-                  <Lock size={18} color={focusedField === 'password' ? Colors.primary : '#94A3B8'} />
+                  <Lock size={18} color={focusedField === 'password' ? Colors.primary : colors.iconSubtle} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -178,7 +183,7 @@ export default function AddStaffScreen() {
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="At least 6 characters"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.iconSubtle}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
@@ -188,9 +193,9 @@ export default function AddStaffScreen() {
                   hitSlop={12}
                 >
                   {showPassword ? (
-                    <EyeOff size={18} color="#64748B" />
+                    <EyeOff size={18} color={colors.iconMedium} />
                   ) : (
-                    <Eye size={18} color="#64748B" />
+                    <Eye size={18} color={colors.iconMedium} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -198,16 +203,16 @@ export default function AddStaffScreen() {
             </View>
 
             {/* Biometric enrollment hint banner */}
-            <View style={styles.hintBanner}>
+            <View style={[styles.hintBanner, { backgroundColor: colors.hintBannerBg, borderColor: colors.hintBannerBorder }]}>
               <Sparkles size={16} color={Colors.secondary} style={{ marginTop: 2 }} />
-              <Text style={styles.hintBannerText}>
+              <Text style={[styles.hintBannerText, { color: colors.hintBannerText }]}>
                 After adding, you will be prompted to snap and register their face biometrics for 1:1 attendance verification.
               </Text>
             </View>
 
             {/* Submit Button */}
             <TouchableOpacity 
-              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              style={[styles.submitButton, { ...shadows.sm }, loading && styles.submitButtonDisabled]}
               onPress={handleAddStaff}
               disabled={loading}
               activeOpacity={0.85}
@@ -233,7 +238,6 @@ export default function AddStaffScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   container: {
     padding: Spacing.md,
@@ -241,19 +245,15 @@ const styles = StyleSheet.create({
   headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
   },
   iconCircle: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#EBF5FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
@@ -269,17 +269,13 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 13,
-    color: Colors.textSecondary,
     marginTop: 2,
     lineHeight: 18,
   },
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
   },
   formGroup: {
     marginBottom: Spacing.md,
@@ -287,16 +283,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
     marginBottom: 6,
     letterSpacing: -0.2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
     borderRadius: BorderRadius.lg,
     height: 48,
     paddingHorizontal: 12,
@@ -328,11 +321,9 @@ const styles = StyleSheet.create({
   hintBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#F0FDF4',
     padding: 12,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
     marginTop: Spacing.xs,
     marginBottom: Spacing.lg,
     gap: 8,
@@ -340,7 +331,6 @@ const styles = StyleSheet.create({
   hintBannerText: {
     flex: 1,
     fontSize: 12,
-    color: '#166534',
     lineHeight: 18,
     fontWeight: '500',
   },
@@ -350,7 +340,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.sm,
   },
   submitButtonDisabled: {
     opacity: 0.6,

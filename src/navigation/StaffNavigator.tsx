@@ -6,6 +6,7 @@ import { StaffStackParamList, StaffTabParamList } from '../types';
 import { Camera, Clock, LogOut } from 'lucide-react-native';
 import { Colors } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 // Import screens
 import { AttendanceScreen } from '../screens/staff/AttendanceScreen';
@@ -17,6 +18,7 @@ const Stack = createNativeStackNavigator<StaffStackParamList>();
 
 function StaffTabs() {
   const { logout } = useAuth();
+  const { colors } = useTheme();
 
   const handleLogout = () => {
     Alert.alert(
@@ -37,11 +39,11 @@ function StaffTabs() {
     <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarStyle: { 
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.tabBarBg,
           borderTopWidth: 1,
-          borderTopColor: '#F1F5F9',
+          borderTopColor: colors.tabBarBorder,
           height: 62,
           paddingBottom: 8,
           paddingTop: 8,
@@ -51,12 +53,12 @@ function StaffTabs() {
           fontWeight: '600',
         },
         headerStyle: { 
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.headerBg,
           shadowOpacity: 0,
           elevation: 0,
         },
         headerShadowVisible: false,
-        headerTintColor: Colors.textPrimary,
+        headerTintColor: colors.textPrimary,
         headerTitleStyle: {
           fontWeight: '700',
           fontSize: 18,
@@ -65,12 +67,15 @@ function StaffTabs() {
         headerRight: () => (
           <TouchableOpacity 
             onPress={handleLogout} 
-            style={styles.logoutButton} 
+            style={[styles.logoutButton, { 
+              backgroundColor: colors.logoutBg, 
+              borderColor: colors.logoutBorder 
+            }]} 
             activeOpacity={0.8}
             hitSlop={8}
           >
-            <LogOut size={15} color="#64748B" style={{ marginRight: 4 }} />
-            <Text style={styles.logoutText}>Exit</Text>
+            <LogOut size={15} color={colors.logoutIcon} style={{ marginRight: 4 }} />
+            <Text style={[styles.logoutText, { color: colors.logoutText }]}>Exit</Text>
           </TouchableOpacity>
         ),
       }}
@@ -127,13 +132,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   logoutText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
   },
 });

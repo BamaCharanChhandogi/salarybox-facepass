@@ -22,15 +22,17 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react-native';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { getAllStaff } from '../../services/database';
 import { resolvePhotoUri } from '../../services/fileSystem';
 import { AdminStackParamList, StaffWithEnrollment } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList, 'StaffList'>;
 
 export default function StaffListScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { colors, shadows } = useTheme();
   const [staff, setStaff] = useState<StaffWithEnrollment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -69,37 +71,43 @@ export default function StaffListScreen() {
 
     return (
       <TouchableOpacity 
-        style={styles.staffCard}
+        style={[styles.staffCard, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle, ...shadows.sm }]}
         onPress={() => navigation.navigate('StaffProfile', { staffId: item.id })}
         activeOpacity={0.8}
       >
         <View style={styles.avatarContainer}>
           {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+            <Image source={{ uri: photoUri }} style={[styles.avatarImage, { borderColor: colors.border }]} />
           ) : (
-            <View style={styles.avatarFallback}>
-              <User size={20} color="#94A3B8" />
+            <View style={[styles.avatarFallback, { backgroundColor: colors.surfaceSubtle }]}>
+              <User size={20} color={colors.iconSubtle} />
             </View>
           )}
         </View>
 
         <View style={styles.staffInfo}>
           <Text style={styles.staffName}>{item.name}</Text>
-          <Text style={styles.employeeId}>ID: {item.employeeId}</Text>
+          <Text style={[styles.employeeId, { color: colors.textSecondary }]}>ID: {item.employeeId}</Text>
         </View>
 
-        <View style={[styles.badge, item.isEnrolled ? styles.badgeEnrolled : styles.badgeNotEnrolled]}>
+        <View style={[
+          styles.badge, 
+          item.isEnrolled ? { backgroundColor: colors.badgeEnrolledBgAlt } : { backgroundColor: colors.badgePendingBg }
+        ]}>
           {item.isEnrolled ? (
-            <CheckCircle2 size={12} color="#059669" style={{ marginRight: 4 }} />
+            <CheckCircle2 size={12} color={colors.badgeEnrolledText} style={{ marginRight: 4 }} />
           ) : (
-            <AlertCircle size={12} color="#D97706" style={{ marginRight: 4 }} />
+            <AlertCircle size={12} color={colors.badgePendingText} style={{ marginRight: 4 }} />
           )}
-          <Text style={[styles.badgeText, item.isEnrolled ? styles.badgeTextEnrolled : styles.badgeTextNotEnrolled]}>
+          <Text style={[
+            styles.badgeText, 
+            item.isEnrolled ? { color: colors.badgeEnrolledTextAlt } : { color: colors.badgePendingTextAlt }
+          ]}>
             {item.isEnrolled ? 'Enrolled' : 'Pending'}
           </Text>
         </View>
 
-        <ChevronRight size={18} color="#CBD5E1" />
+        <ChevronRight size={18} color={colors.textMuted} />
       </TouchableOpacity>
     );
   };
@@ -107,15 +115,15 @@ export default function StaffListScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
       {/* Search Header */}
-      <View style={styles.searchBarContainer}>
-        <View style={styles.searchBox}>
-          <Search size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+      <View style={[styles.searchBarContainer, { backgroundColor: colors.surface, borderBottomColor: colors.surfaceSubtle }]}>
+        <View style={[styles.searchBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Search size={18} color={colors.iconSubtle} style={{ marginRight: 10 }} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: Colors.textPrimary }]}
             placeholder="Search staff by name or ID..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.iconSubtle}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -135,9 +143,9 @@ export default function StaffListScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <User size={48} color="#94A3B8" />
+              <User size={48} color={colors.iconSubtle} />
               <Text style={styles.emptyTitle}>No Staff Found</Text>
-              <Text style={styles.emptySubtitle}>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                 {searchQuery ? 'No matching staff members found.' : 'Add your first staff member to get started.'}
               </Text>
             </View>
@@ -147,7 +155,7 @@ export default function StaffListScreen() {
 
       {/* Floating Add Staff Button */}
       <TouchableOpacity 
-        style={[styles.fab, { bottom: Math.max(insets.bottom, 16) + 16 }]}
+        style={[styles.fab, { bottom: Math.max(insets.bottom, 16) + 16, ...shadows.md }]}
         onPress={() => navigation.navigate('AddStaff')}
         activeOpacity={0.85}
       >
@@ -160,29 +168,23 @@ export default function StaffListScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   searchBarContainer: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     borderRadius: BorderRadius.lg,
     paddingHorizontal: 12,
     height: 44,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: Colors.textPrimary,
   },
   listContent: {
     padding: Spacing.md,
@@ -196,13 +198,10 @@ const styles = StyleSheet.create({
   staffCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.xs + 2,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
   },
   avatarContainer: {
     marginRight: Spacing.md,
@@ -212,13 +211,11 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
   },
   avatarFallback: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -233,7 +230,6 @@ const styles = StyleSheet.create({
   },
   employeeId: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
   badge: {
@@ -244,21 +240,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginRight: 8,
   },
-  badgeEnrolled: {
-    backgroundColor: '#DCFCE7',
-  },
-  badgeNotEnrolled: {
-    backgroundColor: '#FEF3C7',
-  },
   badgeText: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  badgeTextEnrolled: {
-    color: '#15803D',
-  },
-  badgeTextNotEnrolled: {
-    color: '#B45309',
   },
   emptyContainer: {
     flex: 1,
@@ -274,14 +258,12 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 13,
-    color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 4,
     paddingHorizontal: 32,
   },
   fab: {
     position: 'absolute',
-    bottom: 24,
     right: 20,
     width: 54,
     height: 54,
@@ -289,6 +271,5 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.md,
   },
 });

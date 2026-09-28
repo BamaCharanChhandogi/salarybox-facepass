@@ -16,10 +16,11 @@ import {
   Sparkles,
   Trash2
 } from 'lucide-react-native';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { getStaffById, getAttendanceForUser, deleteStaffMember } from '../../services/database';
 import { AdminStackParamList, StaffWithEnrollment, AttendanceRecord } from '../../types';
 import { resolvePhotoUri } from '../../services/fileSystem';
+import { useTheme } from '../../context/ThemeContext';
 
 type ProfileRouteProp = RouteProp<AdminStackParamList, 'StaffProfile'>;
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList, 'StaffProfile'>;
@@ -28,6 +29,7 @@ export default function StaffProfileScreen() {
   const insets = useSafeAreaInsets();
   const route = useRoute<ProfileRouteProp>();
   const navigation = useNavigation<NavigationProp>();
+  const { colors, shadows } = useTheme();
   const { staffId } = route.params;
   
   const [staff, setStaff] = useState<StaffWithEnrollment | null>(null);
@@ -90,7 +92,7 @@ export default function StaffProfileScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -98,7 +100,7 @@ export default function StaffProfileScreen() {
 
   if (!staff) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <AlertCircle size={40} color={Colors.error} />
         <Text style={styles.errorText}>Staff member not found</Text>
       </View>
@@ -108,22 +110,23 @@ export default function StaffProfileScreen() {
   const enrollmentPhotoFullUri = staff.enrollmentPhotoUri ? resolvePhotoUri(staff.enrollmentPhotoUri) : null;
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) + 30 }]}>
         
         {/* Profile Header Card */}
-        <View style={styles.profileHeader}>
+        <View style={[styles.profileHeader, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle, ...shadows.sm }]}>
           <View style={styles.avatarWrapper}>
             {enrollmentPhotoFullUri ? (
-              <Image source={{ uri: enrollmentPhotoFullUri }} style={styles.avatar} />
+              <Image source={{ uri: enrollmentPhotoFullUri }} style={[styles.avatar, { borderColor: colors.surfaceSubtle }]} />
             ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <User size={40} color="#94A3B8" />
+              <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors.surfaceSubtle, borderColor: colors.surfaceSubtle }]}>
+                <User size={40} color={colors.iconSubtle} />
               </View>
             )}
             <View style={[
               styles.avatarBadge,
-              staff.isEnrolled ? styles.avatarBadgeActive : styles.avatarBadgePending
+              { borderColor: colors.surface },
+              staff.isEnrolled ? { backgroundColor: colors.statusDotActive } : { backgroundColor: Colors.warning }
             ]}>
               {staff.isEnrolled ? (
                 <CheckCircle2 size={14} color="#FFFFFF" />
@@ -136,25 +139,25 @@ export default function StaffProfileScreen() {
           <Text style={styles.name}>{staff.name}</Text>
           
           <View style={styles.idBadgeRow}>
-            <View style={styles.idBadge}>
-              <Text style={styles.idBadgeText}>ID: {staff.employeeId}</Text>
+            <View style={[styles.idBadge, { backgroundColor: colors.surfaceSubtle }]}>
+              <Text style={[styles.idBadgeText, { color: colors.labelColor }]}>ID: {staff.employeeId}</Text>
             </View>
-            <View style={styles.dotSeparator} />
+            <View style={[styles.dotSeparator, { backgroundColor: colors.textMuted }]} />
             <View style={styles.joinedBadge}>
-              <Calendar size={12} color="#64748B" style={{ marginRight: 4 }} />
-              <Text style={styles.joinedText}>Joined {formatDate(staff.createdAt)}</Text>
+              <Calendar size={12} color={colors.iconMedium} style={{ marginRight: 4 }} />
+              <Text style={[styles.joinedText, { color: colors.textSecondary }]}>Joined {formatDate(staff.createdAt)}</Text>
             </View>
           </View>
         </View>
 
         {/* Biometrics Card */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Biometric Registration</Text>
-          <View style={styles.biometricCard}>
+          <Text style={[styles.sectionHeader, { color: colors.labelColor }]}>Biometric Registration</Text>
+          <View style={[styles.biometricCard, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle, ...shadows.sm }]}>
             <View style={styles.biometricLeft}>
               <View style={[
                 styles.biometricIconBox,
-                staff.isEnrolled ? styles.biometricIconBoxSuccess : styles.biometricIconBoxWarning
+                staff.isEnrolled ? { backgroundColor: colors.statePillReadyBg } : { backgroundColor: colors.badgePendingBg }
               ]}>
                 <ScanFace size={22} color={staff.isEnrolled ? '#0D9488' : '#D97706'} />
               </View>
@@ -162,7 +165,7 @@ export default function StaffProfileScreen() {
                 <Text style={styles.biometricTitle}>
                   {staff.isEnrolled ? 'Face Registered' : 'Biometrics Missing'}
                 </Text>
-                <Text style={styles.biometricSubtitle}>
+                <Text style={[styles.biometricSubtitle, { color: colors.textSecondary }]}>
                   {staff.isEnrolled 
                     ? '1:1 facial matching active for attendance' 
                     : 'Staff cannot punch until face is enrolled'}
@@ -173,14 +176,16 @@ export default function StaffProfileScreen() {
             <TouchableOpacity 
               style={[
                 styles.biometricActionBtn,
-                staff.isEnrolled ? styles.biometricActionBtnSecondary : styles.biometricActionBtnPrimary
+                staff.isEnrolled 
+                  ? [styles.biometricActionBtnSecondary, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border }]
+                  : styles.biometricActionBtnPrimary
               ]}
               onPress={() => navigation.navigate('FaceEnroll', { staffId: staff.id, staffName: staff.name })}
               activeOpacity={0.85}
             >
               <Text style={[
                 styles.biometricActionBtnText,
-                staff.isEnrolled ? styles.biometricActionBtnTextSecondary : styles.biometricActionBtnTextPrimary
+                staff.isEnrolled ? { color: Colors.textPrimary } : styles.biometricActionBtnTextPrimary
               ]}>
                 {staff.isEnrolled ? 'Re-enrol' : 'Enrol Face'}
               </Text>
@@ -191,8 +196,8 @@ export default function StaffProfileScreen() {
         {/* Recent Attendance Activity */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>Attendance History</Text>
-            <Text style={styles.sectionSubCount}>{attendance.length} recent logs</Text>
+            <Text style={[styles.sectionHeader, { color: colors.labelColor }]}>Attendance History</Text>
+            <Text style={[styles.sectionSubCount, { color: colors.textTertiary }]}>{attendance.length} recent logs</Text>
           </View>
 
           {attendance.length > 0 ? (
@@ -200,12 +205,12 @@ export default function StaffProfileScreen() {
               const selfieUri = resolvePhotoUri(record.selfieUri);
               const isCheckIn = record.type === 'check_in';
               return (
-                <View key={record.id} style={styles.attendanceCard}>
+                <View key={record.id} style={[styles.attendanceCard, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle, ...shadows.sm }]}>
                   <View style={styles.attendanceThumbBox}>
                     {selfieUri ? (
-                      <Image source={{ uri: selfieUri }} style={styles.selfieThumbnail} />
+                      <Image source={{ uri: selfieUri }} style={[styles.selfieThumbnail, { borderColor: colors.border }]} />
                     ) : (
-                      <View style={[styles.typeIconFallback, isCheckIn ? styles.checkInIcon : styles.checkOutIcon]}>
+                      <View style={[styles.typeIconFallback, isCheckIn ? { backgroundColor: colors.badgeEnrolledBg } : { backgroundColor: colors.checkOutIconBg }]}>
                         <Clock size={18} color={isCheckIn ? '#059669' : '#0284C7'} />
                       </View>
                     )}
@@ -215,11 +220,11 @@ export default function StaffProfileScreen() {
                     <View style={styles.badgeRow}>
                       <View style={[
                         styles.punchBadge, 
-                        isCheckIn ? styles.punchBadgeCheckIn : styles.punchBadgeCheckOut
+                        isCheckIn ? { backgroundColor: colors.badgeEnrolledBgAlt } : { backgroundColor: colors.checkOutCardBorder }
                       ]}>
                         <Text style={[
                           styles.punchBadgeText,
-                          isCheckIn ? styles.punchBadgeCheckInText : styles.punchBadgeCheckOutText
+                          isCheckIn ? { color: colors.badgeEnrolledTextAlt } : { color: colors.typeCheckOutText }
                         ]}>
                           {isCheckIn ? 'CHECK IN' : 'CHECK OUT'}
                         </Text>
@@ -227,12 +232,12 @@ export default function StaffProfileScreen() {
                       <Text style={styles.attendanceTime}>{formatTime(record.timestamp)}</Text>
                     </View>
 
-                    <Text style={styles.attendanceDate}>{formatDate(record.timestamp)}</Text>
+                    <Text style={[styles.attendanceDate, { color: colors.textSecondary }]}>{formatDate(record.timestamp)}</Text>
 
                     {record.address ? (
                       <View style={styles.locationRow}>
-                        <MapPin size={12} color="#64748B" style={{ marginRight: 4, marginTop: 1 }} />
-                        <Text style={styles.attendanceAddress} numberOfLines={1}>
+                        <MapPin size={12} color={colors.iconMedium} style={{ marginRight: 4, marginTop: 1 }} />
+                        <Text style={[styles.attendanceAddress, { color: colors.textSecondary }]} numberOfLines={1}>
                           {record.address}
                         </Text>
                       </View>
@@ -243,16 +248,16 @@ export default function StaffProfileScreen() {
                     <Text style={styles.matchScoreNumber}>
                       {(record.matchConfidence * 100).toFixed(0)}%
                     </Text>
-                    <Text style={styles.matchScoreLabel}>Match</Text>
+                    <Text style={[styles.matchScoreLabel, { color: colors.textTertiary }]}>Match</Text>
                   </View>
                 </View>
               );
             })
           ) : (
-            <View style={styles.emptyCard}>
-              <Clock size={32} color="#94A3B8" />
+            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle }]}>
+              <Clock size={32} color={colors.iconSubtle} />
               <Text style={styles.emptyTitle}>No Attendance Activity</Text>
-              <Text style={styles.emptySubtitle}>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                 No punches recorded yet for this staff member.
               </Text>
             </View>
@@ -277,7 +282,6 @@ export default function StaffProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   deleteStaffCta: {
     flexDirection: 'row',
@@ -303,7 +307,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     padding: Spacing.xl,
   },
   errorText: {
@@ -316,11 +319,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.md,
-    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
     marginBottom: Spacing.md,
   },
   avatarWrapper: {
@@ -332,10 +332,8 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: 44,
     borderWidth: 3,
-    borderColor: '#F1F5F9',
   },
   avatarPlaceholder: {
-    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -349,13 +347,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  avatarBadgeActive: {
-    backgroundColor: '#10B981',
-  },
-  avatarBadgePending: {
-    backgroundColor: '#F59E0B',
   },
   name: {
     fontSize: 20,
@@ -369,7 +360,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   idBadge: {
-    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -377,13 +367,11 @@ const styles = StyleSheet.create({
   idBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
   },
   dotSeparator: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#CBD5E1',
     marginHorizontal: 8,
   },
   joinedBadge: {
@@ -392,7 +380,6 @@ const styles = StyleSheet.create({
   },
   joinedText: {
     fontSize: 12,
-    color: '#64748B',
   },
   section: {
     marginBottom: Spacing.lg,
@@ -406,25 +393,20 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#475569',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: Spacing.xs,
   },
   sectionSubCount: {
     fontSize: 12,
-    color: '#94A3B8',
   },
   biometricCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
   },
   biometricLeft: {
     flexDirection: 'row',
@@ -440,12 +422,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  biometricIconBoxSuccess: {
-    backgroundColor: '#CCFBF1',
-  },
-  biometricIconBoxWarning: {
-    backgroundColor: '#FEF3C7',
-  },
   biometricTextContainer: {
     flex: 1,
   },
@@ -456,7 +432,6 @@ const styles = StyleSheet.create({
   },
   biometricSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 2,
     lineHeight: 16,
   },
@@ -469,9 +444,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   biometricActionBtnSecondary: {
-    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   biometricActionBtnText: {
     fontSize: 13,
@@ -480,19 +453,13 @@ const styles = StyleSheet.create({
   biometricActionBtnTextPrimary: {
     color: '#FFFFFF',
   },
-  biometricActionBtnTextSecondary: {
-    color: Colors.textPrimary,
-  },
   attendanceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.xs + 2,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
   },
   attendanceThumbBox: {
     marginRight: Spacing.md,
@@ -502,7 +469,6 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
   },
   typeIconFallback: {
     width: 48,
@@ -510,12 +476,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  checkInIcon: {
-    backgroundColor: '#ECFDF5',
-  },
-  checkOutIcon: {
-    backgroundColor: '#F0F9FF',
   },
   attendanceDetails: {
     flex: 1,
@@ -531,21 +491,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  punchBadgeCheckIn: {
-    backgroundColor: '#DCFCE7',
-  },
-  punchBadgeCheckOut: {
-    backgroundColor: '#E0F2FE',
-  },
   punchBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-  },
-  punchBadgeCheckInText: {
-    color: '#15803D',
-  },
-  punchBadgeCheckOutText: {
-    color: '#0369A1',
   },
   attendanceTime: {
     fontSize: 12,
@@ -554,7 +502,6 @@ const styles = StyleSheet.create({
   },
   attendanceDate: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginBottom: 2,
   },
   locationRow: {
@@ -563,7 +510,6 @@ const styles = StyleSheet.create({
   },
   attendanceAddress: {
     fontSize: 11,
-    color: '#64748B',
     flex: 1,
   },
   matchScoreBox: {
@@ -577,16 +523,13 @@ const styles = StyleSheet.create({
   },
   matchScoreLabel: {
     fontSize: 10,
-    color: '#94A3B8',
   },
   emptyCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.xl,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
   },
   emptyTitle: {
     fontSize: 14,
@@ -596,7 +539,6 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
 });

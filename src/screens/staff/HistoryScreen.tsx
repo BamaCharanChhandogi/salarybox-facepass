@@ -4,14 +4,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Clock, MapPin, Calendar, CheckCircle2, ScanFace } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { getAttendanceForUser } from '../../services/database';
 import { resolvePhotoUri } from '../../services/fileSystem';
 import { AttendanceRecord } from '../../types';
 import { formatTime, formatDate } from '../../utils/dateFormat';
+import { useTheme } from '../../context/ThemeContext';
 
 export function HistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, shadows } = useTheme();
   const { user } = useAuth();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,14 +42,14 @@ export function HistoryScreen() {
     const isCheckIn = item.type === 'check_in';
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceSubtle, ...shadows.sm }]}>
         <View style={styles.cardMainRow}>
           {/* Selfie Thumbnail */}
           <View style={styles.thumbContainer}>
             {selfieUri ? (
-              <Image source={{ uri: selfieUri }} style={styles.thumbImage} />
+              <Image source={{ uri: selfieUri }} style={[styles.thumbImage, { borderColor: colors.border }]} />
             ) : (
-              <View style={[styles.typeIconBox, isCheckIn ? styles.typeCheckInBox : styles.typeCheckOutBox]}>
+              <View style={[styles.typeIconBox, isCheckIn ? { backgroundColor: colors.badgeEnrolledBg } : { backgroundColor: colors.checkOutIconBg }]}>
                 <Clock size={20} color={isCheckIn ? '#059669' : '#0284C7'} />
               </View>
             )}
@@ -58,11 +60,11 @@ export function HistoryScreen() {
             <View style={styles.titleRow}>
               <View style={[
                 styles.typeBadge, 
-                isCheckIn ? styles.typeCheckIn : styles.typeCheckOut
+                isCheckIn ? { backgroundColor: colors.badgeEnrolledBgAlt } : { backgroundColor: colors.checkOutCardBorder }
               ]}>
                 <Text style={[
                   styles.typeBadgeText, 
-                  isCheckIn ? styles.textCheckIn : styles.textCheckOut
+                  isCheckIn ? { color: colors.badgeEnrolledTextAlt } : { color: colors.typeCheckOutText }
                 ]}>
                   {isCheckIn ? 'CHECK IN' : 'CHECK OUT'}
                 </Text>
@@ -70,12 +72,12 @@ export function HistoryScreen() {
               <Text style={styles.timeText}>{formatTime(item.timestamp)}</Text>
             </View>
 
-            <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(item.timestamp)}</Text>
 
             {item.address ? (
               <View style={styles.locationRow}>
-                <MapPin size={11} color="#64748B" style={{ marginRight: 3, marginTop: 1 }} />
-                <Text style={styles.addressText} numberOfLines={1}>
+                <MapPin size={11} color={colors.iconMedium} style={{ marginRight: 3, marginTop: 1 }} />
+                <Text style={[styles.addressText, { color: colors.textSecondary }]} numberOfLines={1}>
                   {item.address}
                 </Text>
               </View>
@@ -87,7 +89,7 @@ export function HistoryScreen() {
             <Text style={styles.scoreNumber}>
               {Math.round(item.matchConfidence * 100)}%
             </Text>
-            <Text style={styles.scoreLabel}>AI Match</Text>
+            <Text style={[styles.scoreLabel, { color: colors.textTertiary }]}>AI Match</Text>
           </View>
         </View>
       </View>
@@ -95,13 +97,13 @@ export function HistoryScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.surfaceSubtle }]}>
         <View>
           <Text style={styles.headerTitle}>Attendance History</Text>
-          <Text style={styles.headerSubtitle}>Verified punch records & location logs</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Verified punch records & location logs</Text>
         </View>
-        <View style={styles.countBadge}>
+        <View style={[styles.countBadge, { backgroundColor: colors.kpiBlueBg, borderColor: colors.dateBoxBorder }]}>
           <Text style={styles.countBadgeText}>{records.length} logs</Text>
         </View>
       </View>
@@ -116,9 +118,9 @@ export function HistoryScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Calendar size={48} color="#94A3B8" />
+            <Calendar size={48} color={colors.iconSubtle} />
             <Text style={styles.emptyTitle}>No Attendance Records Yet</Text>
-            <Text style={styles.emptySubtext}>Mark attendance from the punch screen to see your history.</Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Mark attendance from the punch screen to see your history.</Text>
           </View>
         }
       />
@@ -129,7 +131,6 @@ export function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
@@ -137,9 +138,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   headerTitle: {
     fontSize: 18,
@@ -149,16 +148,13 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
   countBadge: {
-    backgroundColor: '#EFF6FF',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
   },
   countBadgeText: {
     fontSize: 12,
@@ -170,13 +166,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.xs + 2,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
   },
   cardMainRow: {
     flexDirection: 'row',
@@ -190,7 +183,6 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 23,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
   },
   typeIconBox: {
     width: 46,
@@ -198,12 +190,6 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  typeCheckInBox: {
-    backgroundColor: '#ECFDF5',
-  },
-  typeCheckOutBox: {
-    backgroundColor: '#F0F9FF',
   },
   cardDetails: {
     flex: 1,
@@ -219,21 +205,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  typeCheckIn: {
-    backgroundColor: '#DCFCE7',
-  },
-  typeCheckOut: {
-    backgroundColor: '#E0F2FE',
-  },
   typeBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-  },
-  textCheckIn: {
-    color: '#15803D',
-  },
-  textCheckOut: {
-    color: '#0369A1',
   },
   timeText: {
     fontSize: 12,
@@ -242,7 +216,6 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginBottom: 2,
   },
   locationRow: {
@@ -251,7 +224,6 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 11,
-    color: '#64748B',
     flex: 1,
   },
   scoreContainer: {
@@ -265,7 +237,6 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     fontSize: 10,
-    color: '#94A3B8',
   },
   emptyContainer: {
     flex: 1,
@@ -281,7 +252,6 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 13,
-    color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 4,
     paddingHorizontal: 32,

@@ -5,6 +5,7 @@ import { AdminStackParamList } from '../types';
 import { LogOut } from 'lucide-react-native';
 import { Colors } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 // Import screens
 import DashboardScreen from '../screens/admin/DashboardScreen';
@@ -17,13 +18,14 @@ const Stack = createNativeStackNavigator<AdminStackParamList>();
 
 export const AdminNavigator = () => {
   const { logout } = useAuth();
+  const { colors } = useTheme();
 
   return (
     <Stack.Navigator
       initialRouteName="Dashboard"
       screenOptions={{
-        headerStyle: { backgroundColor: '#FFFFFF' },
-        headerTintColor: Colors.textPrimary,
+        headerStyle: { backgroundColor: colors.headerBg },
+        headerTintColor: colors.textPrimary,
         headerTitleStyle: {
           fontWeight: '700',
           fontSize: 18,

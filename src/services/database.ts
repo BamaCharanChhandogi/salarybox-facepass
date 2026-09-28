@@ -79,9 +79,13 @@ export async function authenticateUser(
   employeeId: string,
   password: string
 ): Promise<User | null> {
+  const cleanId = employeeId.trim();
+  const cleanPass = password.trim();
   const row = await getDb().getFirstAsync<any>(
-    'SELECT * FROM users WHERE employee_id = ? AND password = ?',
-    [employeeId, password]
+    `SELECT * FROM users 
+     WHERE (UPPER(TRIM(employee_id)) = UPPER(?) OR UPPER(TRIM(name)) = UPPER(?)) 
+       AND password = ?`,
+    [cleanId, cleanId, cleanPass]
   );
   return row ? mapRowToUser(row) : null;
 }

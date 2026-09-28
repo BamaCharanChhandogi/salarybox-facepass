@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -11,7 +11,8 @@ import {
   Alert,
   ScrollView,
   Image,
-  Modal
+  Modal,
+  Keyboard
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,13 +33,16 @@ import {
   X
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { getAllStaff, authenticateUser } from '../../services/database';
 import { resolvePhotoUri } from '../../services/fileSystem';
 import { StaffWithEnrollment } from '../../types';
 
 export function LoginScreen() {
+  const { colors, shadows, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const styles = React.useMemo(() => createStyles(colors, shadows, isDark), [colors, shadows, isDark]);
   const { login, loginDirectly } = useAuth();
 
   const [staffList, setStaffList] = useState<StaffWithEnrollment[]>([]);
@@ -52,12 +56,34 @@ export function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<'id' | 'password' | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // Dynamically fetch all staff members from SQLite database whenever screen gains focus
+  // Track keyboard appearance to push manual sign-in modal cleanly above virtual keyboard
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // Dynamically fetch all staff members from SQLite database with visual feedback cue
   const loadStaff = useCallback(async () => {
     try {
       setLoadingStaff(true);
-      const data = await getAllStaff();
+      const [data] = await Promise.all([
+        getAllStaff(),
+        new Promise((resolve) => setTimeout(resolve, 550))
+      ]);
       setStaffList(data);
     } catch (err) {
       console.error('Failed to load staff list for tap-to-login:', err);
@@ -153,14 +179,6 @@ export function LoginScreen() {
             <Text style={styles.subtitle}>
               Biometric Workforce & Attendance Platform
             </Text>
-            
-            {/* Quick evaluator guidance chip */}
-            <View style={styles.evaluatorChip}>
-              <Sparkles size={13} color="#0084FF" style={{ marginRight: 5 }} />
-              <Text style={styles.evaluatorChipText}>
-                Tap any user below for 1-tap instant testing
-              </Text>
-            </View>
           </View>
 
           {/* ════════════════════════════════════════════════════════════ */}
@@ -168,7 +186,6 @@ export function LoginScreen() {
           {/* ════════════════════════════════════════════════════════════ */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>ADMINISTRATOR</Text>
-            <Text style={styles.sectionSubtitle}>Full Control</Text>
           </View>
 
           <TouchableOpacity 
@@ -219,9 +236,21 @@ export function LoginScreen() {
                 <Text style={styles.countBadgeText}>{staffList.length}</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={loadStaff} hitSlop={10} style={styles.refreshBtn}>
-              <RefreshCw size={13} color="#64748B" style={{ marginRight: 4 }} />
-              <Text style={styles.refreshBtnText}>Refresh</Text>
+            <TouchableOpacity 
+              onPress={loadStaff} 
+              hitSlop={10} 
+              style={[styles.refreshBtn, loadingStaff && styles.refreshBtnActive]}
+              disabled={loadingStaff}
+              activeOpacity={0.7}
+            >
+              {loadingStaff ? (
+                <ActivityIndicator size="small" color="#0084FF" style={{ marginRight: 4 }} />
+              ) : (
+                <RefreshCw size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
+              )}
+              <Text style={[styles.refreshBtnText, loadingStaff && styles.refreshBtnTextActive]}>
+                {loadingStaff ? 'Refreshing...' : 'Refresh'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -236,7 +265,7 @@ export function LoginScreen() {
             </View>
           ) : staffList.length === 0 ? (
             <View style={styles.emptyStaffBox}>
-              <Users size={32} color="#94A3B8" />
+              <Users size={32} color={colors.textTertiary} />
               <Text style={styles.emptyStaffTitle}>No Staff Members Registered</Text>
               <Text style={styles.emptyStaffSubtitle}>
                 Log in as Admin above to register your first staff member.
@@ -265,7 +294,7 @@ export function LoginScreen() {
                         <Image source={{ uri: photoUri }} style={styles.staffAvatarImg} />
                       ) : (
                         <View style={styles.staffAvatarFallback}>
-                          <User size={20} color="#94A3B8" />
+                          <User size={20} color={colors.textTertiary} />
                         </View>
                       )}
                       <View style={[
@@ -344,111 +373,124 @@ export function LoginScreen() {
           visible={showManualForm}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => setShowManualForm(false)}
+          onRequestClose={() => {
+            Keyboard.dismiss();
+            setShowManualForm(false);
+          }}
         >
           <KeyboardAvoidingView 
-            style={styles.modalBackdrop}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardAvoidingView}
           >
-            <TouchableOpacity 
-              style={styles.modalDismissArea} 
-              activeOpacity={1} 
-              onPress={() => setShowManualForm(false)} 
-            />
-            <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
-              <View style={styles.modalHeader}>
-                <View style={styles.modalDragHandle} />
-                <View style={styles.modalHeaderRow}>
-                  <View>
-                    <Text style={styles.modalTitle}>Manual Sign In</Text>
-                    <Text style={styles.modalSubtitle}>Enter your Employee ID & Password</Text>
-                  </View>
-                  <TouchableOpacity 
-                    onPress={() => setShowManualForm(false)}
-                    style={styles.modalCloseBtn}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <X size={20} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <ScrollView 
-                keyboardShouldPersistTaps="handled" 
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingTop: Spacing.sm }}
-              >
-                {/* Employee ID */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Employee ID</Text>
-                  <View style={[
-                    styles.inputWrapper,
-                    focusedField === 'id' && styles.inputWrapperFocused
-                  ]}>
-                    <User size={18} color={focusedField === 'id' ? Colors.primary : '#94A3B8'} style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="e.g. ADMIN001 or EMP001"
-                      placeholderTextColor="#94A3B8"
-                      value={employeeId}
-                      onChangeText={setEmployeeId}
-                      onFocus={() => setFocusedField('id')}
-                      onBlur={() => setFocusedField(null)}
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                      returnKeyType="next"
-                    />
-                  </View>
-                </View>
-
-                {/* Password */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Password</Text>
-                  <View style={[
-                    styles.inputWrapper,
-                    focusedField === 'password' && styles.inputWrapperFocused
-                  ]}>
-                    <Lock size={18} color={focusedField === 'password' ? Colors.primary : '#94A3B8'} style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="Enter account password"
-                      placeholderTextColor="#94A3B8"
-                      value={password}
-                      onChangeText={setPassword}
-                      onFocus={() => setFocusedField('password')}
-                      onBlur={() => setFocusedField(null)}
-                      secureTextEntry={!showPassword}
-                      returnKeyType="done"
-                      onSubmitEditing={handleManualLogin}
-                    />
+            <View style={styles.modalBackdrop}>
+              <TouchableOpacity 
+                style={styles.modalDismissArea} 
+                activeOpacity={1} 
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setShowManualForm(false);
+                }} 
+              />
+              <View style={[
+                styles.modalSheet, 
+                { 
+                  paddingBottom: keyboardHeight > 0 ? 16 : Math.max(insets.bottom, 20) + 16,
+                }
+              ]}>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalDragHandle} />
+                  <View style={styles.modalHeaderRow}>
+                    <View>
+                      <Text style={styles.modalTitle}>Manual Sign In</Text>
+                      <Text style={styles.modalSubtitle}>Enter your Employee ID & Password</Text>
+                    </View>
                     <TouchableOpacity 
-                      onPress={() => setShowPassword(!showPassword)}
-                      style={styles.eyeBtn}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowManualForm(false);
+                      }}
+                      style={styles.modalCloseBtn}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      {showPassword ? (
-                        <EyeOff size={18} color="#64748B" />
-                      ) : (
-                        <Eye size={18} color="#64748B" />
-                      )}
+                      <X size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Sign In Button */}
-                <TouchableOpacity 
-                  style={[styles.primaryButton, manualLoading && styles.buttonDisabled]} 
-                  onPress={handleManualLogin}
-                  disabled={manualLoading}
-                  activeOpacity={0.88}
-                >
-                  {manualLoading ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Text style={styles.primaryButtonText}>Sign In with Credentials</Text>
-                  )}
-                </TouchableOpacity>
-              </ScrollView>
+                {/* Form Inputs Container - Non-scrollable, sticks with full height directly above keyboard */}
+                <View style={styles.modalFormContent}>
+                  {/* Employee ID */}
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>Employee ID or Name</Text>
+                    <View style={[
+                      styles.inputWrapper,
+                      focusedField === 'id' && styles.inputWrapperFocused
+                    ]}>
+                      <User size={18} color={focusedField === 'id' ? Colors.primary : colors.textTertiary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="e.g. ADMIN001 or EMP001"
+                        placeholderTextColor={colors.textTertiary}
+                        value={employeeId}
+                        onChangeText={setEmployeeId}
+                        onFocus={() => setFocusedField('id')}
+                        onBlur={() => setFocusedField(null)}
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                        returnKeyType="next"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Password */}
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>Password</Text>
+                    <View style={[
+                      styles.inputWrapper,
+                      focusedField === 'password' && styles.inputWrapperFocused
+                    ]}>
+                      <Lock size={18} color={focusedField === 'password' ? Colors.primary : colors.textTertiary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Enter account password"
+                        placeholderTextColor={colors.textTertiary}
+                        value={password}
+                        onChangeText={setPassword}
+                        onFocus={() => setFocusedField('password')}
+                        onBlur={() => setFocusedField(null)}
+                        secureTextEntry={!showPassword}
+                        returnKeyType="done"
+                        onSubmitEditing={handleManualLogin}
+                      />
+                      <TouchableOpacity 
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={18} color={colors.textSecondary} />
+                        ) : (
+                          <Eye size={18} color={colors.textSecondary} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Sign In Button */}
+                  <TouchableOpacity 
+                    style={[styles.primaryButton, manualLoading && styles.buttonDisabled]} 
+                    onPress={handleManualLogin}
+                    disabled={manualLoading}
+                    activeOpacity={0.88}
+                  >
+                    {manualLoading ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Text style={styles.primaryButtonText}>Sign In with Credentials</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           </KeyboardAvoidingView>
         </Modal>
@@ -456,10 +498,10 @@ export function LoginScreen() {
     );
   }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, shadows: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   keyboardContainer: {
     flex: 1,
@@ -481,7 +523,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,
-    ...Shadows.md,
+    ...shadows.md,
   },
   brandLogoImage: {
     width: 60,
@@ -506,20 +548,20 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...Typography.caption,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 4,
     textAlign: 'center',
   },
   evaluatorChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.kpiBlueBg,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: colors.dateBoxBorder,
   },
   evaluatorChipText: {
     fontSize: 12,
@@ -541,17 +583,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
+    color: colors.labelColor,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   sectionSubtitle: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: colors.textTertiary,
     fontWeight: '500',
   },
   countBadge: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.border,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 10,
@@ -559,32 +601,45 @@ const styles = StyleSheet.create({
   countBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#475569',
+    color: colors.labelColor,
   },
   refreshBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceSubtle,
+  },
+  refreshBtnActive: {
+    backgroundColor: colors.kpiBlueBg,
+    borderWidth: 1,
+    borderColor: colors.dateBoxBorder,
   },
   refreshBtnText: {
     fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  refreshBtnTextActive: {
+    color: '#0066FF',
+    fontWeight: '700',
   },
   staffListHint: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     marginBottom: 10,
   },
   adminCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     borderWidth: 1.5,
-    borderColor: '#BFDBFE',
-    ...Shadows.sm,
+    borderColor: colors.dateBoxBorder,
+    ...shadows.sm,
   },
   adminCardLeft: {
     flexDirection: 'row',
@@ -596,7 +651,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.kpiBlueBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
@@ -612,16 +667,16 @@ const styles = StyleSheet.create({
   adminName: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     letterSpacing: -0.3,
   },
   adminBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.kpiBlueBg,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: colors.dateBoxBorder,
   },
   adminBadgeText: {
     fontSize: 10,
@@ -630,7 +685,7 @@ const styles = StyleSheet.create({
   },
   adminDesc: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 3,
   },
   enterButton: {
@@ -639,7 +694,7 @@ const styles = StyleSheet.create({
   enterButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.kpiBlueBg,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: BorderRadius.lg,
@@ -652,7 +707,7 @@ const styles = StyleSheet.create({
   },
   cardActive: {
     borderColor: '#0084FF',
-    backgroundColor: '#F0F7FF',
+    backgroundColor: isDark ? colors.surfaceSubtle : '#F0F7FF',
   },
   loadingBox: {
     paddingVertical: Spacing.xl,
@@ -662,26 +717,26 @@ const styles = StyleSheet.create({
   },
   loadingBoxText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   emptyStaffBox: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: colors.borderLight,
   },
   emptyStaffTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: 10,
   },
   emptyStaffSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 4,
   },
@@ -691,12 +746,12 @@ const styles = StyleSheet.create({
   staffCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    ...Shadows.sm,
+    borderColor: colors.borderLight,
+    ...shadows.sm,
   },
   staffAvatarWrap: {
     position: 'relative',
@@ -707,13 +762,13 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: colors.avatarBorder,
   },
   staffAvatarFallback: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.avatarFallbackBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -727,13 +782,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    borderColor: colors.surface,
   },
   avatarMiniBadgeEnrolled: {
-    backgroundColor: '#10B981',
+    backgroundColor: colors.statusDotActive,
   },
   avatarMiniBadgePending: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: Colors.warning,
   },
   staffInfo: {
     flex: 1,
@@ -741,7 +796,7 @@ const styles = StyleSheet.create({
   staffNameText: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     letterSpacing: -0.3,
   },
   staffSubRow: {
@@ -751,7 +806,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   empIdBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSubtle,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -759,7 +814,7 @@ const styles = StyleSheet.create({
   empIdBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#475569',
+    color: colors.labelColor,
   },
   enrollStatusPill: {
     paddingHorizontal: 6,
@@ -767,20 +822,20 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   enrollStatusPillSuccess: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: colors.badgeEnrolledBgAlt,
   },
   enrollStatusPillWarning: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.badgePendingBg,
   },
   enrollStatusText: {
     fontSize: 10,
     fontWeight: '600',
   },
   enrollStatusTextSuccess: {
-    color: '#15803D',
+    color: colors.badgeEnrolledTextAlt,
   },
   enrollStatusTextWarning: {
-    color: '#B45309',
+    color: colors.badgePendingTextAlt,
   },
   staffActionBox: {
     paddingLeft: 8,
@@ -788,13 +843,13 @@ const styles = StyleSheet.create({
   staffEnterPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FDFA',
+    backgroundColor: colors.checkInIconBg,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: BorderRadius.md,
     gap: 3,
     borderWidth: 1,
-    borderColor: '#CCFBF1',
+    borderColor: colors.checkInCardBorder,
   },
   staffEnterText: {
     fontSize: 12,
@@ -815,33 +870,33 @@ const styles = StyleSheet.create({
   manualAccordionText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   manualCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: colors.borderLight,
     marginTop: 6,
-    ...Shadows.sm,
+    ...shadows.sm,
   },
   fieldGroup: {
-    marginBottom: Spacing.md,
+    marginBottom: 12,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
+    color: colors.labelColor,
     marginBottom: 6,
     letterSpacing: -0.2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.inputBackground,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: colors.inputBorder,
     borderRadius: BorderRadius.lg,
     height: 48,
     paddingHorizontal: Spacing.md,
@@ -855,8 +910,9 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     height: '100%',
+    paddingVertical: 0,
   },
   eyeBtn: {
     padding: 6,
@@ -868,7 +924,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: Spacing.xs,
-    ...Shadows.sm,
+    ...shadows.sm,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -879,32 +935,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.2,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: colors.modalOverlay,
     justifyContent: 'flex-end',
   },
   modalDismissArea: {
-    flex: 1,
+    ...StyleSheet.absoluteFill,
   },
   modalSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.modalBackground,
     borderTopLeftRadius: BorderRadius.xl * 1.5,
     borderTopRightRadius: BorderRadius.xl * 1.5,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.sm,
-    maxHeight: '85%',
-    ...Shadows.lg,
+    ...shadows.lg,
+  },
+  modalFormContent: {
+    paddingTop: Spacing.xs,
   },
   modalHeader: {
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: 12,
   },
   modalDragHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: colors.modalDragHandle,
     marginBottom: Spacing.sm,
   },
   modalHeaderRow: {
@@ -916,18 +977,18 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   modalSubtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     marginTop: 2,
   },
   modalCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },

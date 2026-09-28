@@ -28,7 +28,7 @@ import {
   Trash2,
   User as UserIcon
 } from 'lucide-react-native';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { 
   getTotalStaffCount, 
   getEnrolledCount, 
@@ -39,6 +39,7 @@ import {
 import { resolvePhotoUri } from '../../services/fileSystem';
 import { useAuth } from '../../context/AuthContext';
 import { AdminStackParamList, StaffWithEnrollment } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList, 'Dashboard'>;
 
@@ -47,6 +48,7 @@ export default function DashboardScreen() {
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const topSpacing = Math.max(insets.top, 24) + Spacing.sm;
+  const { colors, shadows } = useTheme();
   
   const [stats, setStats] = useState({ total: 0, enrolled: 0, today: 0 });
   const [staff, setStaff] = useState<StaffWithEnrollment[]>([]);
@@ -133,50 +135,50 @@ export default function DashboardScreen() {
       {/* Top Greeting Bar */}
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.adminNameText}>Workspace Admin</Text>
-          <Text style={styles.welcomeText}>ADMIN001 • CONTROL & AUDIT</Text>
+          <Text style={[styles.adminNameText, { color: colors.textPrimary }]}>Workspace Admin</Text>
+          <Text style={[styles.welcomeText, { color: colors.textTertiary }]}>ADMIN001 • CONTROL & AUDIT</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8} hitSlop={8}>
-          <LogOut size={15} color="#64748B" style={{ marginRight: 4 }} />
-          <Text style={styles.logoutBtnText}>Exit</Text>
+        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleLogout} activeOpacity={0.8} hitSlop={8}>
+          <LogOut size={15} color={colors.iconMedium} style={{ marginRight: 4 }} />
+          <Text style={[styles.logoutBtnText, { color: colors.textSecondary }]}>Exit</Text>
         </TouchableOpacity>
       </View>
 
       {/* Summary KPI Cards */}
       <View style={styles.kpiGrid}>
-        <View style={styles.kpiCard}>
-          <View style={[styles.kpiIconWrap, { backgroundColor: '#EFF6FF' }]}>
-            <Users size={18} color="#0084FF" />
+        <View style={[styles.kpiCard, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.kpiIconWrap, { backgroundColor: colors.kpiBlueBg }]}>
+            <Users size={18} color={colors.primary} />
           </View>
-          <Text style={styles.kpiValue}>{stats.total}</Text>
-          <Text style={styles.kpiLabel}>Total Staff</Text>
+          <Text style={[styles.kpiValue, { color: colors.textPrimary }]}>{stats.total}</Text>
+          <Text style={[styles.kpiLabel, { color: colors.textSecondary }]}>Total Staff</Text>
         </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.kpiIconWrap, { backgroundColor: '#ECFDF5' }]}>
+        <View style={[styles.kpiCard, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.kpiIconWrap, { backgroundColor: colors.kpiGreenBg }]}>
             <UserCheck size={18} color="#10B981" />
           </View>
-          <Text style={styles.kpiValue}>{stats.enrolled}</Text>
-          <Text style={styles.kpiLabel}>Faces Enrolled</Text>
+          <Text style={[styles.kpiValue, { color: colors.textPrimary }]}>{stats.enrolled}</Text>
+          <Text style={[styles.kpiLabel, { color: colors.textSecondary }]}>Faces Enrolled</Text>
         </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.kpiIconWrap, { backgroundColor: '#F0FDFA' }]}>
+        <View style={[styles.kpiCard, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.kpiIconWrap, { backgroundColor: colors.kpiTealBg }]}>
             <Clock size={18} color="#0D9488" />
           </View>
-          <Text style={styles.kpiValue}>{stats.today}</Text>
-          <Text style={styles.kpiLabel}>Punches Today</Text>
+          <Text style={[styles.kpiValue, { color: colors.textPrimary }]}>{stats.today}</Text>
+          <Text style={[styles.kpiLabel, { color: colors.textSecondary }]}>Punches Today</Text>
         </View>
       </View>
 
       {/* Staff Directory Header */}
       <View style={styles.directoryHeaderRow}>
         <View>
-          <Text style={styles.directoryTitle}>Staff Directory</Text>
-          <Text style={styles.directorySubtitle}>{filteredStaff.length} employees</Text>
+          <Text style={[styles.directoryTitle, { color: colors.textPrimary }]}>Staff Directory</Text>
+          <Text style={[styles.directorySubtitle, { color: colors.textSecondary }]}>{filteredStaff.length} employees</Text>
         </View>
         <TouchableOpacity 
-          style={styles.addStaffHeaderBtn}
+          style={[styles.addStaffHeaderBtn, { backgroundColor: colors.primary }]}
           onPress={() => navigation.navigate('AddStaff')}
           activeOpacity={0.85}
         >
@@ -186,18 +188,18 @@ export default function DashboardScreen() {
       </View>
 
       {/* Search Input Bar */}
-      <View style={styles.searchBar}>
-        <Search size={16} color={Colors.textTertiary} style={styles.searchIcon} />
+      <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Search size={16} color={colors.textTertiary} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.textPrimary }]}
           placeholder="Search staff by name or employee ID..."
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <X size={16} color={Colors.textSecondary} />
+            <X size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -210,10 +212,16 @@ export default function DashboardScreen() {
           return (
             <TouchableOpacity
               key={filter}
-              style={[styles.filterTab, isActive && styles.filterTabActive]}
+              style={[
+                styles.filterTab, 
+                { backgroundColor: isActive ? colors.primary : colors.surfaceSubtle }
+              ]}
               onPress={() => setActiveFilter(filter)}
             >
-              <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+              <Text style={[
+                styles.filterTabText, 
+                { color: isActive ? 'white' : colors.textSecondary }
+              ]}>
                 {label}
               </Text>
             </TouchableOpacity>
@@ -228,37 +236,37 @@ export default function DashboardScreen() {
 
     return (
       <TouchableOpacity 
-        style={styles.staffCard}
+        style={[styles.staffCard, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() => navigation.navigate('StaffProfile', { staffId: item.id })}
         activeOpacity={0.85}
       >
-        <View style={styles.avatarWrap}>
+        <View style={[styles.avatarWrap, { borderColor: colors.border }]}>
           {photoUri ? (
             <Image source={{ uri: photoUri }} style={styles.avatarImg} />
           ) : (
-            <View style={styles.avatarFallback}>
-              <UserIcon size={20} color={Colors.textSecondary} />
+            <View style={[styles.avatarFallback, { backgroundColor: colors.avatarFallbackBg || colors.surfaceSubtle }]}>
+              <UserIcon size={20} color={colors.textSecondary} />
             </View>
           )}
         </View>
 
         <View style={styles.staffDetails}>
-          <Text style={styles.staffName}>{item.name}</Text>
-          <Text style={styles.employeeId}>ID: {item.employeeId}</Text>
+          <Text style={[styles.staffName, { color: colors.textPrimary }]}>{item.name}</Text>
+          <Text style={[styles.employeeId, { color: colors.textSecondary }]}>ID: {item.employeeId}</Text>
         </View>
 
         <View style={[
           styles.badge, 
-          item.isEnrolled ? styles.badgeEnrolled : styles.badgePending
+          { backgroundColor: item.isEnrolled ? colors.badgeEnrolledBg : colors.badgePendingBg }
         ]}>
           {item.isEnrolled ? (
-            <CheckCircle2 size={12} color="#059669" style={{ marginRight: 3 }} />
+            <CheckCircle2 size={12} color={colors.badgeEnrolledText} style={{ marginRight: 3 }} />
           ) : (
-            <AlertCircle size={12} color="#D97706" style={{ marginRight: 3 }} />
+            <AlertCircle size={12} color={colors.badgePendingText} style={{ marginRight: 3 }} />
           )}
           <Text style={[
             styles.badgeText, 
-            item.isEnrolled ? styles.badgeTextEnrolled : styles.badgeTextPending
+            { color: item.isEnrolled ? colors.badgeEnrolledText : colors.badgePendingText }
           ]}>
             {item.isEnrolled ? 'Enrolled' : 'Pending'}
           </Text>
@@ -272,19 +280,19 @@ export default function DashboardScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.7}
         >
-          <Trash2 size={16} color="#94A3B8" />
+          <Trash2 size={16} color={colors.iconSubtle} />
         </TouchableOpacity>
 
-        <ChevronRight size={16} color={Colors.textTertiary} style={{ marginLeft: 2 }} />
+        <ChevronRight size={16} color={colors.textTertiary} style={{ marginLeft: 2 }} />
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {loading && !refreshing ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -295,15 +303,15 @@ export default function DashboardScreen() {
           contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) + 30 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Users size={40} color={Colors.textTertiary} />
-              <Text style={styles.emptyTitle}>
+              <Users size={40} color={colors.textTertiary} />
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
                 {searchQuery ? 'No matching staff members' : 'No staff members registered'}
               </Text>
-              <Text style={styles.emptySubtitle}>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                 {searchQuery ? 'Try adjusting your search query' : 'Tap the "Add Staff" button to register your first employee.'}
               </Text>
             </View>
@@ -317,7 +325,6 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   centerContainer: {
     flex: 1,
@@ -340,26 +347,21 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     ...Typography.badge,
-    color: Colors.textTertiary,
   },
   adminNameText: {
     ...Typography.h2,
-    color: Colors.textPrimary,
     marginTop: 2,
   },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     paddingHorizontal: Spacing.sm + 2,
     paddingVertical: 6,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   logoutBtnText: {
     ...Typography.captionMedium,
-    color: Colors.textSecondary,
   },
   kpiGrid: {
     flexDirection: 'row',
@@ -368,12 +370,9 @@ const styles = StyleSheet.create({
   },
   kpiCard: {
     flex: 1,
-    backgroundColor: 'white',
     borderRadius: BorderRadius.m,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    ...Shadows.sm,
   },
   kpiIconWrap: {
     width: 32,
@@ -387,11 +386,9 @@ const styles = StyleSheet.create({
     ...Typography.h1,
     fontSize: 20,
     lineHeight: 24,
-    color: Colors.textPrimary,
   },
   kpiLabel: {
     ...Typography.small,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
   directoryHeaderRow: {
@@ -402,17 +399,14 @@ const styles = StyleSheet.create({
   },
   directoryTitle: {
     ...Typography.h3,
-    color: Colors.textPrimary,
   },
   directorySubtitle: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: 1,
   },
   addStaffHeaderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0084FF',
     paddingHorizontal: Spacing.md,
     paddingVertical: 8,
     borderRadius: BorderRadius.m,
@@ -425,10 +419,8 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: BorderRadius.m,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     paddingHorizontal: Spacing.md,
     height: 44,
     marginBottom: Spacing.sm,
@@ -440,7 +432,6 @@ const styles = StyleSheet.create({
     flex: 1,
     ...Typography.body,
     fontSize: 14,
-    color: Colors.textPrimary,
     paddingVertical: 0,
   },
   filterTabsRow: {
@@ -452,29 +443,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm + 4,
     paddingVertical: 5,
     borderRadius: BorderRadius.full,
-    backgroundColor: '#F1F5F9',
-  },
-  filterTabActive: {
-    backgroundColor: '#0084FF',
   },
   filterTabText: {
     ...Typography.captionMedium,
     fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  filterTabTextActive: {
-    color: 'white',
   },
   staffCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: BorderRadius.m,
     padding: Spacing.md,
     marginBottom: Spacing.xs + 3,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    ...Shadows.sm,
   },
   avatarWrap: {
     width: 44,
@@ -483,7 +463,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginRight: Spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   avatarImg: {
     width: 44,
@@ -492,7 +471,6 @@ const styles = StyleSheet.create({
   avatarFallback: {
     width: 44,
     height: 44,
-    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -502,12 +480,10 @@ const styles = StyleSheet.create({
   staffName: {
     ...Typography.bodySemiBold,
     fontSize: 14,
-    color: Colors.textPrimary,
   },
   employeeId: {
     ...Typography.small,
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
   badge: {
@@ -517,21 +493,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: BorderRadius.full,
   },
-  badgeEnrolled: {
-    backgroundColor: '#ECFDF5',
-  },
-  badgePending: {
-    backgroundColor: '#FEF3C7',
-  },
   badgeText: {
     ...Typography.badge,
     fontSize: 10,
-  },
-  badgeTextEnrolled: {
-    color: '#059669',
-  },
-  badgeTextPending: {
-    color: '#D97706',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -540,12 +504,10 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     ...Typography.bodySemiBold,
-    color: Colors.textPrimary,
     marginTop: Spacing.md,
   },
   emptySubtitle: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: Spacing.xs,
     textAlign: 'center',
     paddingHorizontal: Spacing.xl,
@@ -558,3 +520,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+

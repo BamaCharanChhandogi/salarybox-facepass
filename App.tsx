@@ -8,6 +8,8 @@ import {
   Inter_700Bold 
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
+import { Camera } from 'expo-camera';
+import * as Location from 'expo-location';
 import { Providers } from './src/Providers';
 
 // Safely prevent auto hide (catch in Expo Go to avoid crashing)
@@ -26,6 +28,26 @@ export default function App() {
       await SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded, fontError]);
+
+  // Request all required production permissions (Camera & Location) upfront on app launch
+  useEffect(() => {
+    async function requestAppPermissions() {
+      try {
+        await Promise.all([
+          Camera.requestCameraPermissionsAsync().catch((err: any) => {
+            console.warn('[App] Camera permission upfront request error:', err);
+          }),
+          Location.requestForegroundPermissionsAsync().catch((err: any) => {
+            console.warn('[App] Location permission upfront request error:', err);
+          }),
+        ]);
+      } catch (err: any) {
+        console.warn('[App] Permissions initialization error:', err);
+      }
+    }
+
+    requestAppPermissions();
+  }, []);
 
   // Fallback timer: if fonts take longer than 1.5s, dismiss splash and render with system fonts
   useEffect(() => {

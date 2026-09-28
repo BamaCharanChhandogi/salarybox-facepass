@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle, View } from 'react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 export interface ButtonProps {
   title: string;
@@ -27,6 +28,8 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { colors } = useTheme();
+
   const getContainerStyle = (pressed: boolean) => {
     const baseStyle: any[] = [styles.container, styles[`${size}Container`], fullWidth && styles.fullWidth];
     
@@ -34,7 +37,7 @@ export const Button: React.FC<ButtonProps> = ({
       if (variant === 'outline' || variant === 'ghost') {
         return [...baseStyle, { opacity: 0.5 }];
       }
-      return [...baseStyle, styles.disabledContainer];
+      return [...baseStyle, { backgroundColor: colors.textMuted }];
     }
     
     if (pressed) {
@@ -50,7 +53,10 @@ export const Button: React.FC<ButtonProps> = ({
       if (variant === 'outline' || variant === 'ghost') {
         return [...baseStyle, styles[`${variant}Text`]];
       }
-      return [...baseStyle, styles.disabledText];
+      return [...baseStyle, { color: colors.textTertiary }];
+    }
+    if (variant === 'secondary') {
+      return [...baseStyle, { color: colors.textPrimary }];
     }
     return [...baseStyle, styles[`${variant}Text`]];
   };
@@ -122,9 +128,6 @@ const styles = StyleSheet.create({
   dangerContainer: {
     backgroundColor: Colors.error,
   },
-  disabledContainer: {
-    backgroundColor: '#CBD5E1',
-  },
   text: {
     ...Typography.button,
     textAlign: 'center',
@@ -142,9 +145,6 @@ const styles = StyleSheet.create({
   primaryText: {
     color: '#FFFFFF',
   },
-  secondaryText: {
-    color: '#0F172A',
-  },
   outlineText: {
     color: Colors.primary,
   },
@@ -153,9 +153,6 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     color: '#FFFFFF',
-  },
-  disabledText: {
-    color: '#94A3B8',
   },
   iconContainer: {
     marginRight: 8,
