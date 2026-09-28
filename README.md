@@ -6,7 +6,15 @@ Designed with SalaryBox visual identity, **Inter** typography, **Lucide** iconog
 
 ---
 
-## 🚀 Key Features
+## 📦 Quick Links & Submission Deliverables
+
+- 🤖 **Android Standalone APK (Install Link):** [Download Latest APK (Build 93b87a5d)](https://expo.dev/accounts/bama676s-team/projects/salarybox-facepass/builds/93b87a5d-5358-465c-b22c-e2ec5ee6fde4)
+- 📋 **System Architecture & Decision Log:** [ARCHITECTURE_AND_DECISIONS.md](./ARCHITECTURE_AND_DECISIONS.md)
+- 📄 **AI Conversation Export (JSON - As Requested):** [ai_conversation_transcript.json](./ai_conversation_transcript.json)
+- 📖 **AI Conversation Export (Markdown):** [CHAT_EXPORT.md](./CHAT_EXPORT.md)
+- 🐙 **GitHub Repository:** [https://github.com/BamaCharanChhandogi/salarybox-facepass](https://github.com/BamaCharanChhandogi/salarybox-facepass)
+
+---
 
 ### 1. Frictionless Tap-to-Login & Evaluation
 - **Instant Admin Access:** Single prominent card at the top allowing one-tap login as **Super Administrator** (`ADMIN001`) with zero credential typing.
